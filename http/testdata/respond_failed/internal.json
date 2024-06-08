@@ -1,0 +1,5 @@
+{
+    "code": 500,
+    "message": "something bad happened",
+    "status": "Internal"
+}

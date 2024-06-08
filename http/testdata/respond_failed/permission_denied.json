@@ -1,0 +1,16 @@
+{
+    "code": 403,
+    "details": [
+        {
+            "domain": "googleapis.com",
+            "metadata": {
+                "resource": "projects/123",
+                "service": "pubsub.googleapis.com"
+            },
+            "reason": "PERMISSION_DENIED",
+            "type": "type.googleapis.com/google.rpc.ErrorInfo"
+        }
+    ],
+    "message": "permission denied",
+    "status": "Unauthenticated"
+}

@@ -1,0 +1,15 @@
+{
+    "code": 401,
+    "details": [
+        {
+            "domain": "api.example.com",
+            "metadata": {
+                "err": "failed to parse JWT token"
+            },
+            "reason": "UNAUTHENTICATED",
+            "type": "type.googleapis.com/google.rpc.ErrorInfo"
+        }
+    ],
+    "message": "request could not be authenticated",
+    "status": "Unauthenticated"
+}

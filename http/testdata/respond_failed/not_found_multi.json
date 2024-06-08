@@ -1,0 +1,22 @@
+{
+    "code": 404,
+    "details": [
+        {
+            "resourceInfos": [
+                {
+                    "description": "resource not found",
+                    "resourceName": "projects/12345/buckets/MyErrors",
+                    "resourceType": "storage.v1.Bucket"
+                },
+                {
+                    "description": "resource not found",
+                    "resourceName": "projects/12345/iam/MyUser",
+                    "resourceType": "iam.v1.User"
+                }
+            ],
+            "type": "type.googleapis.com/google.rpc.ResourceInfo"
+        }
+    ],
+    "message": "requested resource not found",
+    "status": "NotFound"
+}

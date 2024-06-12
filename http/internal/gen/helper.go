@@ -17,26 +17,26 @@ const ctxKeyRequestID = "x_requestID"
 /* -------------------------------------------------------------------------- */
 
 // getCustomStatusString maps HTTP status codes to custom status strings
-func getCustomStatusString(statusCode int) string {
-	switch statusCode {
-	case http.StatusOK:
-		return "OK"
-	case http.StatusBadRequest:
-		return "INVALID_ARGUMENT"
-	case http.StatusUnauthorized:
-		return "UNAUTHORIZED"
-	case http.StatusForbidden:
-		return "PERMISSION_DENIED"
-	case http.StatusNotFound:
-		return "NOT_FOUND"
-	case http.StatusConflict:
-		return "ALREADY_EXISTS"
-	case http.StatusInternalServerError:
-		return "INTERNAL_ERROR"
-	default:
-		return "UNKNOWN_STATUS"
-	}
-}
+// func getCustomStatusString(statusCode int) string {
+// 	switch statusCode {
+// 	case http.StatusOK:
+// 		return "OK"
+// 	case http.StatusBadRequest:
+// 		return "INVALID_ARGUMENT"
+// 	case http.StatusUnauthorized:
+// 		return "UNAUTHORIZED"
+// 	case http.StatusForbidden:
+// 		return "PERMISSION_DENIED"
+// 	case http.StatusNotFound:
+// 		return "NOT_FOUND"
+// 	case http.StatusConflict:
+// 		return "ALREADY_EXISTS"
+// 	case http.StatusInternalServerError:
+// 		return "INTERNAL_ERROR"
+// 	default:
+// 		return "UNKNOWN_STATUS"
+// 	}
+// }
 
 func (e *Error) Error() string {
 	// TODO

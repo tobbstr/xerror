@@ -7,7 +7,9 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/stretchr/testify v1.9.0
 	github.com/tobbstr/golden v0.1.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237
 	google.golang.org/grpc v1.64.0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (

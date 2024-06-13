@@ -1,7 +1,7 @@
 package xerror
 
 /* -------------------------------------------------------------------------- */
-/*                                Constructors                                */
+/*                          Server-initialized errors                         */
 /* -------------------------------------------------------------------------- */
 
 func NewInvalidArgument(opts BadRequestViolationOptions) *Error {

@@ -141,7 +141,7 @@ func (_ factory) newNotFound(opts NotFoundOptions) *Error {
 	const msg = "requested resources not found"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
@@ -157,7 +157,7 @@ func (_ factory) newNotFoundBulk(opts NotFoundBulkOptions) *Error {
 	const msg = "requested resources not found"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddResourceInfos(opts.ResourceInfos)
@@ -177,7 +177,7 @@ func (f factory) newAlreadyExists(opts AlreadyExistsOptions) *Error {
 	const msg = "resource already exists"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
@@ -193,7 +193,7 @@ func (_ factory) newAlreadyExistsBulk(opts AlreadyExistsBulkOptions) *Error {
 	const msg = "resources already exist"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 	e.AddResourceInfos(opts.ResourceInfos)
 	return e
@@ -208,7 +208,7 @@ type ResourceExhaustedOptions struct {
 func (_ factory) newResourceExhausted(opts ResourceExhaustedOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddQuotaViolations([]QuotaViolation{opts.QuotaViolation})
@@ -224,7 +224,7 @@ type ResourcesExhaustedOptions struct {
 func (_ factory) newResourcesExhausted(opts ResourcesExhaustedOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddQuotaViolations(opts.QuotaViolations)
@@ -235,7 +235,7 @@ func (_ factory) newCanceledError(logLevel LogLevel) *Error {
 	const msg = "request canceled by the client"
 	e := &Error{
 		status:   *status.New(codes.Canceled, msg),
-		LogLevel: logLevel,
+		logLevel: logLevel,
 	}
 	return e
 }
@@ -261,7 +261,7 @@ func (f factory) newNotImplemented(logLevel LogLevel) *Error {
 	const msg = "not implemented"
 	e := &Error{
 		status:   *status.New(codes.Unimplemented, msg),
-		LogLevel: logLevel,
+		logLevel: logLevel,
 	}
 	return e
 }
@@ -279,7 +279,7 @@ func (f factory) newDeadlineExceeded(opts ErrorWithHiddenDetailsOptions) *Error 
 func (_ factory) newBadRequest(msg string, opts BadRequestViolationOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.InvalidArgument, msg),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddBadRequestViolations([]BadRequestViolation{opts.Violation})
@@ -289,7 +289,7 @@ func (_ factory) newBadRequest(msg string, opts BadRequestViolationOptions) *Err
 func (_ factory) newBadRequestBulk(msg string, opts BadRequestViolationsOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.InvalidArgument, msg),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 
 	e.AddBadRequestViolations(opts.Violations)
@@ -299,7 +299,7 @@ func (_ factory) newBadRequestBulk(msg string, opts BadRequestViolationsOptions)
 func (f factory) newErrorInfoError(code codes.Code, opts ErrorInfoOptions) *Error {
 	e := &Error{
 		status:   *status.New(code, opts.Error.Error()),
-		LogLevel: opts.LogLevel,
+		logLevel: opts.LogLevel,
 	}
 	e.SetErrorInfo(f.domain, opts.Reason, opts.Metadata)
 	return e
@@ -308,7 +308,7 @@ func (f factory) newErrorInfoError(code codes.Code, opts ErrorInfoOptions) *Erro
 func (_ factory) newErrorWithHiddenDetails(code codes.Code, opts ErrorWithHiddenDetailsOptions) *Error {
 	return &Error{
 		status:        *status.New(code, opts.Error.Error()),
-		LogLevel:      opts.LogLevel,
+		logLevel:      opts.LogLevel,
 		detailsHidden: true,
 	}
 }

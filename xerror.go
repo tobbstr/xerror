@@ -7,9 +7,12 @@ package xerror
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/runtime/protoiface"
 )
 
 /*
@@ -22,6 +25,15 @@ TODO:
 	6. Make it easy to respond with gRPC errors (unaryinterceptor)
 */
 
+var errNotFound = errors.New("something was not found")
+
+// Var models what the circumstances were when the error was encountered and is used to provide additional context
+// to the error. Its purpose is to be logged and thereby give context to the error in the logs.
+type Var struct {
+	Name  string
+	Value any
+}
+
 // LogLevel is used to control the way the error is logged. For example as an error, warning, notice etc.
 type LogLevel uint8
 
@@ -33,80 +45,21 @@ const (
 	LogLevelError
 )
 
-// const (
-// 	KindUnsupported Kind = iota
-// 	KindInvalidArgs
-// 	KindPreconditionViolation
-// 	KindOutOfRange
-// 	KindUnauthenticated
-// 	KindPermissionDenied
-// 	KindNotFound
-// 	KindAborted
-// 	KindAlreadyExists
-// 	KindResourceExhausted
-// 	KindCanceled
-// 	KindDataLoss
-// 	KindUnknown
-// 	KindInternal
-// 	KindUnimplemented
-// 	KindUnavailable
-// 	KindDeadlineExceeded
-// )
-
-// // Kind is used to categorize errors into different kinds. It's used to provide more context to the error.
-// type Kind uint8
-
-// func (k Kind) String() string {
-// 	switch k {
-// 	case KindUnsupported:
-// 		return "unsupported"
-// 	case KindInvalidArgs:
-// 		return "invalid_arguments"
-// 	case KindPreconditionViolation:
-// 		return "precondition_violation"
-// 	case KindOutOfRange:
-// 		return "out of range"
-// 	case KindUnauthenticated:
-// 		return "unauthenticated"
-// 	case KindPermissionDenied:
-// 		return "permission_denied"
-// 	case KindNotFound:
-// 		return "not_found"
-// 	case KindAborted:
-// 		return "aborted"
-// 	case KindAlreadyExists:
-// 		return "already_exists"
-// 	case KindResourceExhausted:
-// 		return "resource_exhausted"
-// 	case KindCanceled:
-// 		return "cancelled"
-// 	case KindDataLoss:
-// 		return "data_loss"
-// 	case KindUnknown:
-// 		return "unknown"
-// 	case KindInternal:
-// 		return "internal"
-// 	case KindUnimplemented:
-// 		return "not_implemented"
-// 	case KindUnavailable:
-// 		return "unavailable"
-// 	case KindDeadlineExceeded:
-// 		return "deadline_exceeded"
-// 	default:
-// 		return "unsupported"
-// 	}
-// }
-
 type Error struct {
-	LogLevel      LogLevel
+	logLevel      LogLevel
 	status        status.Status
 	detailsHidden bool
+	// runtimeState is a snapshot of the state of the application when the error was encountered. It is used to provide
+	// additional context to the error and is used to log the circumstances when the error was encountered.
+	runtimeState []Var
 }
 
-var errNotFound = errors.New("something was not found")
+func (xerr *Error) Error() string {
+	return xerr.status.String()
+}
 
-func (e *Error) findBadRequest() (*errdetails.BadRequest, error) {
-	for _, detail := range e.status.Details() {
+func (xerr *Error) findBadRequest() (*errdetails.BadRequest, error) {
+	for _, detail := range xerr.status.Details() {
 		switch v := detail.(type) {
 		case *errdetails.BadRequest:
 			return v, nil
@@ -117,8 +70,8 @@ func (e *Error) findBadRequest() (*errdetails.BadRequest, error) {
 	return nil, errNotFound
 }
 
-func (e *Error) findDebugInfo() (*errdetails.DebugInfo, error) {
-	for _, detail := range e.status.Details() {
+func (xerr *Error) findDebugInfo() (*errdetails.DebugInfo, error) {
+	for _, detail := range xerr.status.Details() {
 		switch v := detail.(type) {
 		case *errdetails.DebugInfo:
 			return v, nil
@@ -129,8 +82,8 @@ func (e *Error) findDebugInfo() (*errdetails.DebugInfo, error) {
 	return nil, errNotFound
 }
 
-func (e *Error) findPreconditionFailure() (*errdetails.PreconditionFailure, error) {
-	for _, detail := range e.status.Details() {
+func (xerr *Error) findPreconditionFailure() (*errdetails.PreconditionFailure, error) {
+	for _, detail := range xerr.status.Details() {
 		switch v := detail.(type) {
 		case *errdetails.PreconditionFailure:
 			return v, nil
@@ -141,8 +94,8 @@ func (e *Error) findPreconditionFailure() (*errdetails.PreconditionFailure, erro
 	return nil, errNotFound
 }
 
-func (e *Error) findErrorInfo() (*errdetails.ErrorInfo, error) {
-	for _, detail := range e.status.Details() {
+func (xerr *Error) findErrorInfo() (*errdetails.ErrorInfo, error) {
+	for _, detail := range xerr.status.Details() {
 		switch v := detail.(type) {
 		case *errdetails.ErrorInfo:
 			return v, nil
@@ -153,8 +106,8 @@ func (e *Error) findErrorInfo() (*errdetails.ErrorInfo, error) {
 	return nil, errNotFound
 }
 
-func (e *Error) findQuotaFailure() (*errdetails.QuotaFailure, error) {
-	for _, detail := range e.status.Details() {
+func (xerr *Error) findQuotaFailure() (*errdetails.QuotaFailure, error) {
+	for _, detail := range xerr.status.Details() {
 		switch v := detail.(type) {
 		case *errdetails.QuotaFailure:
 			return v, nil
@@ -173,42 +126,44 @@ func (e *Error) findQuotaFailure() (*errdetails.QuotaFailure, error) {
 //   - OUT_OF_RANGE
 //
 // See: https://cloud.google.com/apis/design/errors#error_payloads
-func (e *Error) AddBadRequestViolations(violations []BadRequestViolation) {
+func (xerr *Error) AddBadRequestViolations(violations []BadRequestViolation) *Error {
 	violationspb := make([]*errdetails.BadRequest_FieldViolation, len(violations))
 	for i, v := range violations {
 		violationspb[i] = &errdetails.BadRequest_FieldViolation{Field: v.Field, Description: v.Description}
 	}
-	existing, err := e.findBadRequest()
+	existing, err := xerr.findBadRequest()
 	if errors.Is(err, errNotFound) {
 		detail := errdetails.BadRequest{FieldViolations: violationspb}
-		status, err := e.status.WithDetails(&detail)
+		status, err := xerr.status.WithDetails(&detail)
 		if err != nil {
 			panic(fmt.Errorf("%v: %w", err, ErrFailedToAddErrorDetails))
 		}
-		e.status = *status
-		return
+		xerr.status = *status
+		return xerr
 	}
 	existing.FieldViolations = append(existing.FieldViolations, violationspb...)
+	return xerr
 }
 
 // AddPreconditionViolations adds a list of precondition violations to the error details. If the error details already
 // contain precondition violations, the new ones are appended to the existing ones.
-func (e *Error) AddPreconditionViolations(violations []PreconditionViolation) {
+func (xerr *Error) AddPreconditionViolations(violations []PreconditionViolation) *Error {
 	violationspb := make([]*errdetails.PreconditionFailure_Violation, len(violations))
 	for i, v := range violations {
 		violationspb[i] = &errdetails.PreconditionFailure_Violation{Description: v.Description, Subject: v.Subject, Type: v.Typ}
 	}
-	existing, err := e.findPreconditionFailure()
+	existing, err := xerr.findPreconditionFailure()
 	if errors.Is(err, errNotFound) {
 		detail := errdetails.PreconditionFailure{Violations: violationspb}
-		status, err := e.status.WithDetails(&detail)
+		status, err := xerr.status.WithDetails(&detail)
 		if err != nil {
 			panic(fmt.Errorf("%v: %w", err, ErrFailedToAddErrorDetails))
 		}
-		e.status = *status
-		return
+		xerr.status = *status
+		return xerr
 	}
 	existing.Violations = append(existing.Violations, violationspb...)
+	return xerr
 }
 
 // SetErrorInfo sets error info details to the error details. If the error details already contain error info
@@ -221,9 +176,9 @@ func (e *Error) AddPreconditionViolations(violations []PreconditionViolation) {
 //   - ABORTED
 //
 // See: https://cloud.google.com/apis/design/errors#error_payloads
-func (e *Error) SetErrorInfo(domain, reason string, metadata map[string]any) {
+func (xerr *Error) SetErrorInfo(domain, reason string, metadata map[string]any) *Error {
 	if reason == "" {
-		return
+		return xerr
 	}
 	if domain == "" {
 		domain = maker.domain
@@ -232,19 +187,20 @@ func (e *Error) SetErrorInfo(domain, reason string, metadata map[string]any) {
 	for k, v := range metadata {
 		metadatapb[k] = fmt.Sprintf("%v", v)
 	}
-	existing, err := e.findErrorInfo()
+	existing, err := xerr.findErrorInfo()
 	if errors.Is(err, errNotFound) {
 		detail := errdetails.ErrorInfo{Domain: domain, Reason: reason, Metadata: metadatapb}
-		status, err := e.status.WithDetails(&detail)
+		status, err := xerr.status.WithDetails(&detail)
 		if err != nil {
 			panic(fmt.Errorf("%v: %w", err, ErrFailedToAddErrorDetails))
 		}
-		e.status = *status
-		return
+		xerr.status = *status
+		return xerr
 	}
 	existing.Domain = domain
 	existing.Reason = reason
 	existing.Metadata = metadatapb
+	return xerr
 }
 
 // AddResourceInfos adds resource info details to the error details. If the error details already contain a
@@ -255,7 +211,7 @@ func (e *Error) SetErrorInfo(domain, reason string, metadata map[string]any) {
 //   - ALREADY_EXISTS
 //
 // See: https://cloud.google.com/apis/design/errors#error_payloads
-func (e *Error) AddResourceInfos(infos []ResourceInfo) {
+func (xerr *Error) AddResourceInfos(infos []ResourceInfo) *Error {
 	for _, info := range infos {
 		detail := errdetails.ResourceInfo{
 			Description:  info.Description,
@@ -263,12 +219,13 @@ func (e *Error) AddResourceInfos(infos []ResourceInfo) {
 			ResourceType: info.ResourceType,
 			Owner:        info.Owner,
 		}
-		status, err := e.status.WithDetails(&detail)
+		status, err := xerr.status.WithDetails(&detail)
 		if err != nil {
 			panic(fmt.Errorf("%v: %w", err, ErrFailedToAddErrorDetails))
 		}
-		e.status = *status
+		xerr.status = *status
 	}
+	return xerr
 }
 
 // SetDebugInfoDetail sets debug info detail to the error details. If the error details already contain a debug info
@@ -282,24 +239,25 @@ func (e *Error) AddResourceInfos(infos []ResourceInfo) {
 //   - DEADLINE_EXCEEDED
 //
 // See: https://cloud.google.com/apis/design/errors#error_payloads
-func (e *Error) SetDebugInfo(detail string, stackEntries []string) {
+func (xerr *Error) SetDebugInfo(detail string, stackEntries []string) *Error {
 	if detail == "" {
-		return
+		return xerr
 	}
 
-	existing, err := e.findDebugInfo()
+	existing, err := xerr.findDebugInfo()
 	if errors.Is(err, errNotFound) {
 		detail := errdetails.DebugInfo{Detail: detail, StackEntries: stackEntries}
-		status, err := e.status.WithDetails(&detail)
+		status, err := xerr.status.WithDetails(&detail)
 		if err != nil {
 			panic(fmt.Errorf("%v: %w", err, ErrFailedToAddErrorDetails))
 		}
-		e.status = *status
-		return
+		xerr.status = *status
+		return xerr
 	}
 
 	existing.Detail = detail
 	existing.StackEntries = stackEntries
+	return xerr
 }
 
 type QuotaViolation struct {
@@ -309,637 +267,262 @@ type QuotaViolation struct {
 
 // AddQuotaViolations adds a list of quota violations to the error details. If the error details already contain quota
 // violations, the new ones are appended to the existing ones.
-func (e *Error) AddQuotaViolations(violations []QuotaViolation) {
+func (xerr *Error) AddQuotaViolations(violations []QuotaViolation) *Error {
 	violationspb := make([]*errdetails.QuotaFailure_Violation, len(violations))
 	for i, v := range violations {
 		violationspb[i] = &errdetails.QuotaFailure_Violation{Subject: v.Subject, Description: v.Description}
 	}
-	existing, err := e.findQuotaFailure()
+	existing, err := xerr.findQuotaFailure()
 	if errors.Is(err, errNotFound) {
 		detail := errdetails.QuotaFailure{Violations: violationspb}
-		status, err := e.status.WithDetails(&detail)
+		status, err := xerr.status.WithDetails(&detail)
 		if err != nil {
 			panic(fmt.Errorf("%v: %w", err, ErrFailedToAddErrorDetails))
 		}
-		e.status = *status
-		return
+		xerr.status = *status
+		return xerr
 	}
 	existing.Violations = append(existing.Violations, violationspb...)
+	return xerr
 }
 
-// // Var models what the circumstances were when the error was encountered and is used to provide additional context
-// // to the error. Its purpose is to be logged and thereby give context to the error in the logs.
-// type Var struct {
-// 	Name  string
-// 	Value any
-// }
+// AddVar adds a variable to the runtime state.
+func (xerr *Error) AddVar(name string, value any) *Error {
+	if name == "" || value == nil {
+		return xerr
+	}
+	xerr.runtimeState = append(xerr.runtimeState, Var{Name: name, Value: value})
+	return xerr
+}
 
-// // Root models a root error and is used when you first encounter an error in your code.
-// // The idiomatic way to use this type is to create a new instance by using the "new" built-in function.
-// //
-// //		Ex.
-// //	 	err := errors.NewRoot(err, "more context to err").AddVar("id", id).SetKind(errors.NotFound)
-// //
-// //nolint:errname
-// type Root struct {
-// 	// Err is the wrapped error.
-// 	Err error
-// 	// Kind is the kind of error that was encountered.
-// 	Kind Kind
-// 	// RuntimeState is a snapshot of the state of the application when the error was encountered.
-// 	RuntimeState []Var
-// 	// DirectlyRetryable is a flag that indicates whether the operation is directly retryable by the client.
-// 	// Directly means that the exact same operation should be retried. For example, a failed gRPC or HTTP request
-// 	// whose response indicates that the operation may be retried.
-// 	DirectlyRetryable bool
-// 	// IndirectlyRetryable is a flag that indicates whether the operation is indirectly retryable by the client.
-// 	// Indirectly means that a retry should be attempted at a higher level in the system. For example, a database
-// 	// transaction that failed because of a deadlock, or a version mismatch in a system that uses optimistic
-// 	// concurrency. Such scenarios are often resolved by retrying the whole transaction-level operation, not just the
-// 	// failing part. In contrast, directly retryable errors are often resolved by retrying the exact same operation.
-// 	// Such retries are often only useful for long running background jobs.
-// 	IndirectlyRetryable bool
-// 	// Severity is the severity of the error used to control the way the error is logged. For example as an error,
-// 	// warning, notice etc.
-// 	Severity LogLevel
-// }
+// AddVars adds multiple variables to the runtime state.
+func (xerr *Error) AddVars(vars ...Var) *Error {
+	for _, v := range vars {
+		_ = xerr.AddVar(v.Name, v.Value)
+	}
+	return xerr
+}
 
-// // NewInternal creates a new Root error. It's a convenience function that allows you to create a Root error with an original
-// // error and a message (or message chain) that provides more context to the error.
-// // If you don't want to provide a message, you can omit it. If you provide multiple messages,
-// // they will be wrapped in a chain of WrappedError instances where the first message is the innermost message.
-// //
-// // Ex. NewInternal(err, "message1", "message2", "message3") will create a chain of WrappedError instances where "message1"
-// // is the innermost message and "message3" is the outermost message. When you call Error() on the Root instance, you'll
-// // get "message3: message2: message1: original error message".
-// func NewInternal(original error, messages ...string) *Root {
-// 	if len(messages) == 0 {
-// 		return &Root{Err: original}
-// 	}
-// 	var root Root
-// 	for i, msg := range messages {
-// 		if i == 0 {
-// 			root.Err = &WrappedError{Msg: msg, Err: original}
-// 			continue
-// 		}
-// 		root.Err = &WrappedError{Msg: msg, Err: root.Err}
-// 	}
-// 	return &root
-// }
+// RuntimeState returns the runtime state of the error. This is used when you want to log the circumstances when the
+// error was encountered.
+func (xerr *Error) RuntimeState() []Var {
+	return xerr.runtimeState
+}
 
-// // Error returns the error message of the wrapped error that was encountered.
-// //
-// // If you have a Root instance whose 'Err' field value is a WrappedError, calling Error() on the Root instance will
-// // return the message of the WrappedError instance.
-// // Ex. Calling root.Error() will return "message1: original error message", given that the WrappedError instance
-// // has the message "message1".
-// func (r *Root) Error() string {
-// 	if r.Err == nil {
-// 		return ""
-// 	}
-// 	return r.Err.Error()
-// }
+// HideDetails marks the error as having hidden details. This is useful when you want to hide the details of the error
+// from external callers. Effectively, this means that the "debug info" and "error info" details are removed from the
+// error when returned to the caller. For this to work, the server has to use the implementation-specific functionality
+// such as the unary interceptor for gRPC.
+func (xerr *Error) HideDetails() *Error {
+	xerr.detailsHidden = true
+	return xerr
+}
 
-// // Original returns the original error that was encountered. It unwraps the error chain and returns the original.
-// func (r *Root) Original() error {
-// 	err := r.Err
-// 	for {
-// 		unwrapped := errors.Unwrap(err)
-// 		if unwrapped != nil {
-// 			err = unwrapped
-// 			continue
-// 		}
-// 		return err
-// 	}
-// }
+// LogLevel returns the log level of the error.
+func (xerr *Error) LogLevel() LogLevel {
+	return xerr.logLevel
+}
 
-// // SetError sets the Root's original error. It must only be called once.
-// func (r *Root) SetError(err error) *Root {
-// 	r.Err = err
-// 	return r
-// }
+// SetLogLevel sets the log level of the error.
+func (xerr *Error) SetLogLevel(level LogLevel) *Error {
+	xerr.logLevel = level
+	return xerr
+}
 
-// // AddVar adds a variable to the RuntimeState slice. It should only be used on variables that will still be in scope
-// // at log-time. If the variable won't be in scope at log-time, it must not be added to the RuntimeState slice.
-// //
-// // For out-of-scope variables, there are other methods that can be used to add them to the RuntimeState slice such as
-// // 'WithIOReaderVar', which is provided for io.Reader variables.
-// //
-// // This method may be called multiple times.
-// func (r *Root) AddVar(name string, value any) *Root {
-// 	if name == "" || value == nil {
-// 		return r
-// 	}
-// 	r.RuntimeState = append(r.RuntimeState, Var{Name: name, Value: value})
-// 	return r
-// }
+// IsDirectlyRetryable returns true if the call that caused the error is directly retryable, otherwise it returns false.
+// Retries should be attempted using an exponential backoff strategy.
+func (xerr *Error) IsDirectlyRetryable() bool {
+	if xerr == nil {
+		return false
+	}
+	if xerr.status.Code() == codes.Unavailable {
+		return true
+	}
+	return false
+}
 
-// // AddVars allows you to add multiple variables to the RuntimeState slice. It's the bulk-variant of AddVar.
-// func (r *Root) AddVars(vars ...Var) *Root {
-// 	for _, v := range vars {
-// 		_ = r.AddVar(v.Name, v.Value)
-// 	}
-// 	return r
-// }
+// IsRetryableAtHigherLevel returns true if the call that caused the error cannot be directly retried, but instead
+// should be retried at a higher level in the system. Example: an optimistic concurrency error in a database
+// transaction, where the whole transaction should be retried, not just the failing part.
+func (xerr *Error) IsRetryableAtHigherLevel() bool {
+	if xerr == nil {
+		return false
+	}
+	switch xerr.status.Code() {
+	case codes.ResourceExhausted, codes.Aborted:
+		return true
+	default:
+		return false
+	}
+}
 
-// // WithIOReaderVar reads the io.Reader and adds the contents to the RuntimeState slice.
-// func (r *Root) WithIOReaderVar(name string, value io.Reader) *Root {
-// 	if name == "" || value == nil {
-// 		return r
-// 	}
-// 	b, err := io.ReadAll(value)
-// 	if err != nil {
-// 		return r
-// 	}
-// 	return r.AddVar(name, string(b))
-// }
+// IsDetailsHidden returns true if the error details are hidden, otherwise it returns false.
+func (xerr *Error) IsDetailsHidden() bool {
+	return xerr.detailsHidden
+}
 
-// // SetKind sets the Root's kind. It must only be called once.
-// func (r *Root) SetKind(kind Kind) *Root {
-// 	r.Kind = kind
-// 	return r
-// }
+// RemoveSensitiveDetails removes sensitive details from the error. This is useful when you want to return the error
+// to the client, but you don't want to expose sensitive details such as debug info or error info.
+func (xerr *Error) RemoveSensitiveDetails() *Error {
+	// Find the indexes of the details that should be deleted
+	var deletingDetails []int
+	for i, detail := range xerr.status.Details() {
+		switch detail.(type) {
+		case *errdetails.DebugInfo, *errdetails.ErrorInfo:
+			deletingDetails = append(deletingDetails, i)
+		default:
+			continue
+		}
+	}
 
-// // WithDirectRetry sets the Root's DirectlyRetryable flag to true.
-// func (r *Root) WithDirectRetry() *Root {
-// 	r.DirectlyRetryable = true
-// 	return r
-// }
+	// Initialize a slice to hold the remaining details
+	remainingDetails := make([]protoiface.MessageV1, 0, len(xerr.status.Details())-len(deletingDetails))
+	for i, detail := range xerr.status.Details() {
+		if slices.Contains(deletingDetails, i) {
+			continue // skip the details that should be deleted
+		}
+		if d, ok := detail.(protoiface.MessageV1); ok {
+			remainingDetails = append(remainingDetails, d)
+		}
+	}
 
-// // Unwrap returns the original error that was encountered.
-// func (r *Root) Unwrap() error {
-// 	return r.Err
-// }
+	// Create a new status with the remaining detail that replaces the old status
+	newStatus := status.New(xerr.status.Code(), xerr.status.Message())
+	for _, detail := range remainingDetails {
+		newStatus, _ = newStatus.WithDetails(detail)
+	}
+	xerr.status = *newStatus
 
-// // WithSeverity sets the Root's severity.
-// func (r *Root) WithSeverity(s LogLevel) *Root {
-// 	r.Severity = s
-// 	return r
-// }
+	return xerr
+}
 
-// // Is traverses err's error chain and compares the first encountered Root error for equality. If equal, it returns true.
-// // If no such error is found or if they're not equal, it returns false.
-// func (r *Root) Is(err error) bool {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		return root.Kind == r.Kind && root.Err.Error() == r.Err.Error()
-// 	}
-// 	return false
-// }
+// SetStatus sets the status of the error.
+func (xerr *Error) SetStatus(s *status.Status) *Error {
+	xerr.status = *s
+	return xerr
+}
 
-// type WrappedError struct {
-// 	Msg string
-// 	Err error
-// }
+// Status returns a copy of the status contained in the error.
+func (xerr *Error) Status() *status.Status {
+	return status.FromProto(xerr.status.Proto())
+}
 
-// func (e *WrappedError) Error() string {
-// 	if e.Err == nil {
-// 		return e.Msg
-// 	}
-// 	return e.Msg + ": " + e.Err.Error()
-// }
+// EqualsDomainError compares the error with the provided domain-specific error details (the domain and reason).
+// The reason is machine-readable and most importantly, it is unique within a particular domain of errors. This
+// method is used to check if a returned error is a particular domain-specific error. This is useful when decisions
+// need to be made based on the error type.
+//
+// Note! Sometimes, decisions can be made based on the status code alone, but when that is not granular enough,
+// the domain and reason should be used to make decisions.
+//
+// Ex.
+//
+//	 err := othersystempb.SomeMethod(ctx, req)
+//	 if err != nil {
+//		 xerr := grpc.XErrorFrom(err)
+//		 if xerr.EqualsDomainError(othersystemerror.Domain, othersystemerror.NO_STOCK) {
+//			 requestMoreStock() // decision based on the error type
+//		 }
+//	 }
+func (xerr *Error) EqualsDomainError(domain, reason string) bool {
+	info, err := xerr.findErrorInfo()
+	if errors.Is(err, errNotFound) {
+		return false
+	}
+	return domain == info.Domain && reason == info.Reason
+}
 
-// func (e *WrappedError) Unwrap() error {
-// 	return e.Err
-// }
+// DomainType returns a unique error type based on the domain and reason. This is used to enable switch-case statements.
+//
+// Ex.
+//
+//	 err := othersystempb.SomeMethod(ctx, req)
+//	 if err != nil {
+//		 xerr := grpc.XErrorFrom(err)
+//		 switch xerr.DomainType() {
+//		 case xerror.DomainType(othersystemerror.Domain, othersystemerror.NO_STOCK):
+//			 requestMoreStock() // decision based on the error type
+func (xerr *Error) DomainType() string {
+	info, err := xerr.findErrorInfo()
+	if errors.Is(err, errNotFound) {
+		return ""
+	}
+	return DomainType(info.Domain, info.Reason)
+}
 
-// // Wrap is a utility function that makes it easier to wrap errors with a message to add more context.
-// func Wrap(err error, msg string) error {
-// 	if err == nil {
-// 		return nil
-// 	}
-// 	if msg == "" {
-// 		return err
-// 	}
-// 	return &WrappedError{Msg: msg, Err: err}
-// }
+type WrappedError struct {
+	Msg string
+	Err error
+}
 
-// // Is traverses err's error chain and compares the first encountered Root error's Kind. If equal, it returns true.
-// // If no such error is found or if their kinds differ, it returns false.
-// func Is(err error, kind Kind) bool {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		return root.Kind == kind
-// 	}
-// 	return false
-// }
+func (wr *WrappedError) Error() string {
+	if wr.Err == nil {
+		return wr.Msg
+	}
+	return wr.Msg + ": " + wr.Err.Error()
+}
 
-// // AddVars adds variables to the RuntimeState slice of a Root error. It's a utility function that makes it easier to
-// // add variables to the RuntimeState slice of a Root error.
-// func AddVars(err error, vars ...Var) {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		root.RuntimeState = append(root.RuntimeState, vars...)
-// 	}
-// }
+// Unwrap returns the directly wrapped error.
+func (wr *WrappedError) Unwrap() error {
+	return wr.Err
+}
 
-// // IsDirectlyRetryable returns true if the error is directly retryable, otherwise it returns false.
-// func IsDirectlyRetryable(err error) bool {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		return root.DirectlyRetryable
-// 	}
-// 	return false
-// }
+// AddVar adds runtime state information to the wrapped Error instance, if there is one.
+func (wr *WrappedError) AddVar(name string, value any) *WrappedError {
+	if name == "" || value == nil {
+		return wr
+	}
+	var xerr *Error
+	if !errors.As(wr.Err, &wr) {
+		return wr
+	}
+	_ = xerr.AddVar(name, value)
+	return wr
+}
 
-// // IsIndirectlyRetryable returns true if the error is indirectly retryable, otherwise it returns false.
-// func IsIndirectlyRetryable(err error) bool {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		return root.DirectlyRetryable
-// 	}
-// 	return false
-// }
+// AddVars adds multiple runtime state information to the wrapped Error instance, if there is one.
+func (wr *WrappedError) AddVars(vars ...Var) *WrappedError {
+	if len(vars) == 0 {
+		return wr
+	}
+	var xerr *Error
+	if !errors.As(wr.Err, &wr) {
+		return wr
+	}
+	_ = xerr.AddVars(vars...)
+	return wr
+}
 
-// // ClearDirectlyRetryable sets the error's DirectlyRetryable flag to false.
-// func ClearDirectlyRetryable(err error) error {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		root.DirectlyRetryable = false
-// 	}
-// 	return err
-// }
+// XError returns the Error instance that is wrapped by the WrappedError instance, if there is one. Otherwise, it
+// returns nil.
+func (wr *WrappedError) XError() *Error {
+	var xerr *Error
+	if !errors.As(wr.Err, &xerr) {
+		return nil
+	}
+	return xerr
+}
 
-// // ClearIndirectlyRetryable sets the error's IndirectlyRetryable flag to false.
-// func ClearIndirectlyRetryable(err error) error {
-// 	var root *Root
-// 	if errors.As(err, &root) {
-// 		root.IndirectlyRetryable = false
-// 	}
-// 	return err
-// }
+// Wrap wrap errors with a message to add more context to the error. It is used when receiving an error from a
+// call that is already an Error instance and you want to add more context to the error.
+//
+// Ex.
+//
+//	 err := pkg.Func() // returns an Error instance
+//	 if err != nil {
+//		  return errors.Wrap(err, "more context to err")
+//	 }
+func Wrap(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+	if msg == "" {
+		return err
+	}
+	return &WrappedError{Msg: msg, Err: err}
+}
 
-// var Factory = factory{}
-
-// type factory struct {
-// 	domain          string
-// 	requestIDCtxKey string
-// }
-
-// // SetFactory initializes the global factory. It must only be called at application startup-time. It is NOT thread-safe.
-// func SetFactory(domain, requestIDCtxKey string) {
-// 	Factory = factory{domain: domain, requestIDCtxKey: requestIDCtxKey}
-// }
-
-// func (_ factory) NewUnknownError(err error) *Error {
-// 	const msg = "something unknown happened"
-// 	root := *NewInternal(err, msg).SetKind(KindUnknown).WithSeverity(LogLevelError)
-// 	e := &Error{
-// 		Internal: root,
-// 		API:      status.New(codes.Unknown, "something unknown happened"),
-// 	}
-// 	return e
-// }
-
-// func (_ factory) NewDeadlineExceeded(err error) *Error {
-// 	const msg = "context deadline exceeded"
-// 	root := *NewInternal(err, msg).SetKind(KindDeadlineExceeded).WithSeverity(LogLevelWarn)
-// 	return &Error{
-// 		Internal: root,
-// 		API:      status.New(codes.DeadlineExceeded, msg),
-// 	}
-// }
-
-// func (f factory) NewInternalError(err error) *Error {
-// 	const msg = "something bad happened"
-// 	if errors.Is(err, context.DeadlineExceeded) {
-// 		return f.NewDeadlineExceeded(err)
-// 	}
-// 	return &Error{
-// 		Internal: *NewInternal(err, msg).SetKind(KindInternal).WithSeverity(LogLevelError),
-// 		API:      status.New(codes.Internal, msg),
-// 	}
-// }
-
-// type BadRequestViolation struct {
-// 	Field, Description string
-// }
-
-// func (f factory) NewInvalidArgumentError(violation BadRequestViolation) *Error {
-// 	const msg = "one or more request arguments were invalid"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindInvalidArgs).
-// 			AddVar("arg_field", violation.Field).AddVar("arg_desc", violation.Description),
-// 		API: status.New(codes.InvalidArgument, msg),
-// 	}
-// 	if err := e.AddBadRequestViolation(violation.Field, violation.Description); err != nil {
-// 		e := f.NewInternalError(fmt.Errorf("failed to add bad request violation: %w", err))
-// 		e.Internal.AddVar("arg_field", violation.Field).AddVar("arg_desc", violation.Description)
-// 		return e
-// 	}
-// 	return e
-// }
-
-// func (_ factory) NewInvalidArgumentErrors(violations []BadRequestViolation) *Error {
-// 	const msg = "one or more request arguments were invalid"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindInvalidArgs).AddVar("arg_violations", violations),
-// 		API:      status.New(codes.InvalidArgument, msg),
-// 	}
-
-// 	violationspb := make([]*errdetails.BadRequest_FieldViolation, 0, len(violations))
-// 	for i, v := range violations {
-// 		violationspb[i] = &errdetails.BadRequest_FieldViolation{Field: v.Field, Description: v.Description}
-// 	}
-// 	_ = e.AddBadRequestViolations(violationspb)
-
-// 	return e
-// }
-
-// func (_ factory) NewPreconditionFailure(description, subject, typ string) *Error {
-// 	const msg = "one or more request preconditions failed"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindPreconditionViolation).WithSeverity(LogLevelWarn),
-// 		API:      status.New(codes.FailedPrecondition, msg),
-// 	}
-// 	_ = e.AddPreconditionViolations([]*errdetails.PreconditionFailure_Violation{{
-// 		Description: description, Subject: subject, Type: typ,
-// 	}})
-// 	return e
-// }
-
-// func (_ factory) NewModelBindingError(err error) *Error {
-// 	const msg = "failed to bind model"
-// 	e := &Error{
-// 		Internal: *NewInternal(err, msg).SetKind(KindInvalidArgs).WithSeverity(LogLevelInfo),
-// 		API:      status.New(codes.InvalidArgument, msg),
-// 	}
-// 	return e
-// }
-
-// func (f factory) NewUnauthenticatedError(err error) *Error {
-// 	const msg = "request could not be authenticated"
-// 	e := &Error{
-// 		Internal: *NewInternal(err, msg).SetKind(KindUnauthenticated).WithSeverity(LogLevelWarn),
-// 		API:      status.New(codes.Unauthenticated, msg),
-// 	}
-// 	// TODO: Make reason and metadata dynamic
-// 	_ = e.SetErrorInfo(f.domain, "UNAUTHENTICATED", map[string]string{
-// 		"err": err.Error(),
-// 	})
-// 	return e
-// }
-
-// func (_ factory) NewNotFoundError(desc, rscName, rscType string) *Error {
-// 	const msg = "requested resource not found"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindNotFound).WithSeverity(LogLevelInfo),
-// 		API:      status.New(codes.NotFound, msg),
-// 	}
-// 	_ = e.SetResourceInfo(desc, rscName, rscType)
-// 	return e
-// }
-
-// func (_ factory) NewNotFoundErrors(infos []*errdetails.ResourceInfo) *Error {
-// 	const msg = "requested resources not found"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindNotFound).WithSeverity(LogLevelInfo),
-// 		API:      status.New(codes.NotFound, msg),
-// 	}
-// 	_ = e.SetResourceInfos(infos)
-// 	return e
-// }
-
-// func (f factory) NewPermissionDeniedError(reason string, metadata map[string]string) *Error { // nolint:unparam
-// 	const msg = "permission denied"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindPermissionDenied).WithSeverity(LogLevelWarn),
-// 		API:      status.New(codes.PermissionDenied, msg),
-// 	}
-// 	_ = e.SetErrorInfo(f.domain, "PERMISSION_DENIED", metadata)
-// 	return e
-// }
-
-// func (_ factory) NewCanceledError() *Error {
-// 	const msg = "request canceled by the client"
-// 	e := &Error{
-// 		Internal: *NewInternal(nil, msg).SetKind(KindCanceled),
-// 		API:      status.New(codes.Canceled, msg),
-// 	}
-// 	return e
-// }
-
-// var errNotFound = errors.New("something was not found")
-
-// type Error struct {
-// 	Internal        Root
-// 	API             *status.Status
-// 	requestIDCtxKey string
-// }
-
-// func (e *Error) findBadRequest() (*errdetails.BadRequest, error) {
-// 	for _, detail := range e.API.Details() {
-// 		switch v := detail.(type) {
-// 		case *errdetails.BadRequest:
-// 			return v, nil
-// 		default:
-// 			continue
-// 		}
-// 	}
-// 	return nil, errNotFound
-// }
-
-// func (e *Error) findResourceInfo() (*errdetails.ResourceInfo, error) {
-// 	for _, detail := range e.API.Details() {
-// 		switch v := detail.(type) {
-// 		case *errdetails.ResourceInfo:
-// 			return v, nil
-// 		default:
-// 			continue
-// 		}
-// 	}
-// 	return nil, errNotFound
-// }
-
-// func (e *Error) findDebugInfo() (*errdetails.DebugInfo, error) {
-// 	for _, detail := range e.API.Details() {
-// 		switch v := detail.(type) {
-// 		case *errdetails.DebugInfo:
-// 			return v, nil
-// 		default:
-// 			continue
-// 		}
-// 	}
-// 	return nil, errNotFound
-// }
-
-// func (e *Error) findRequestInfo() (*errdetails.RequestInfo, error) {
-// 	for _, detail := range e.API.Details() {
-// 		switch v := detail.(type) {
-// 		case *errdetails.RequestInfo:
-// 			return v, nil
-// 		default:
-// 			continue
-// 		}
-// 	}
-// 	return nil, errNotFound
-// }
-
-// func (e *Error) findPreconditionFailure() (*errdetails.PreconditionFailure, error) {
-// 	for _, detail := range e.API.Details() {
-// 		switch v := detail.(type) {
-// 		case *errdetails.PreconditionFailure:
-// 			return v, nil
-// 		default:
-// 			continue
-// 		}
-// 	}
-// 	return nil, errNotFound
-// }
-
-// func (e *Error) findErrorInfo() (*errdetails.ErrorInfo, error) {
-// 	for _, detail := range e.API.Details() {
-// 		switch v := detail.(type) {
-// 		case *errdetails.ErrorInfo:
-// 			return v, nil
-// 		default:
-// 			continue
-// 		}
-// 	}
-// 	return nil, errNotFound
-// }
-
-// // SetRequestInfoDetails sets the request ID in the error details. If the error details already contain a request ID,
-// // it is overwritten.
-// func (e *Error) SetRequestInfo(ctx context.Context) error {
-// 	reqID, exists := ctx.Value(e.requestIDCtxKey).(string)
-// 	if !exists {
-// 		return nil
-// 	}
-
-// 	existing, err := e.findRequestInfo()
-// 	if errors.Is(err, errNotFound) {
-// 		detail := errdetails.RequestInfo{RequestId: reqID}
-// 		e.API, err = e.API.WithDetails(&detail)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-
-// 	existing.RequestId = reqID
-// 	return nil
-// }
-
-// // AddBadRequestViolation adds a bad request violation to the error details. If the error details already contain a bad
-// // request detail, the new field violation is appended to the existing ones.
-// func (e *Error) AddBadRequestViolation(field, desc string) error {
-// 	existing, err := e.findBadRequest()
-// 	if errors.Is(err, errNotFound) {
-// 		detail := errdetails.BadRequest{
-// 			FieldViolations: []*errdetails.BadRequest_FieldViolation{{Description: desc, Field: field}},
-// 		}
-// 		e.API, err = e.API.WithDetails(&detail)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-// 	existing.FieldViolations = append(
-// 		existing.FieldViolations, &errdetails.BadRequest_FieldViolation{Description: desc, Field: field},
-// 	)
-// 	return nil
-// }
-
-// // AddBadRequestViolations adds a list of bad request violations to the error details. If the error details already
-// // contain bad request violations, the new ones are appended to the existing ones.
-// func (e *Error) AddBadRequestViolations(violations []*errdetails.BadRequest_FieldViolation) []error {
-// 	var errs []error
-// 	for _, v := range violations {
-// 		if err := e.AddBadRequestViolation(v.Field, v.Description); err != nil {
-// 			errs = append(errs, err)
-// 		}
-// 	}
-// 	return errs
-// }
-
-// // AddPreconditionViolations adds a list of precondition violations to the error details. If the error details already
-// // contain precondition violations, the new ones are appended to the existing ones.
-// func (e *Error) AddPreconditionViolations(violations []*errdetails.PreconditionFailure_Violation) error {
-// 	existing, err := e.findPreconditionFailure()
-// 	if errors.Is(err, errNotFound) {
-// 		detail := errdetails.PreconditionFailure{Violations: violations}
-// 		e.API, err = e.API.WithDetails(&detail)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-// 	existing.Violations = append(existing.Violations, violations...)
-// 	return nil
-// }
-
-// // SetErrorInfo sets error info details to the error details. If the error details already contain error info
-// // details, they are overwritten.
-// func (e *Error) SetErrorInfo(domain, reason string, metadata map[string]string) error {
-// 	existing, err := e.findErrorInfo()
-// 	if errors.Is(err, errNotFound) {
-// 		detail := errdetails.ErrorInfo{Domain: domain, Reason: reason, Metadata: metadata}
-// 		e.API, err = e.API.WithDetails(&detail)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-// 	existing.Domain = domain
-// 	existing.Reason = reason
-// 	existing.Metadata = metadata
-// 	return nil
-// }
-
-// // SetResourceInfoDetail sets a resource info detail to the error details. If the error details already contain a
-// // resource info detail, it is overwritten.
-// func (e *Error) SetResourceInfo(desc, resourceName, resourceType string) error {
-// 	existing, err := e.findResourceInfo()
-// 	if errors.Is(err, errNotFound) {
-// 		detail := errdetails.ResourceInfo{
-// 			Description:  desc,
-// 			ResourceName: resourceName,
-// 			ResourceType: resourceType,
-// 		}
-// 		e.API, err = e.API.WithDetails(&detail)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-
-// 	// Overwrite the existing resource info detail
-// 	existing.ResourceName = resourceName
-// 	existing.ResourceType = resourceType
-// 	existing.Description = desc
-// 	return nil
-// }
-
-// // SetResourceInfoDetail sets a resource info detail to the error details. If the error details already contain a
-// // resource info detail, it is overwritten.
-// func (e *Error) SetResourceInfos(infos []*errdetails.ResourceInfo) error {
-// 	for _, info := range infos {
-// 		if err := e.SetResourceInfo(info.Description, info.ResourceName, info.ResourceType); err != nil {
-// 			return err
-// 		}
-// 	}
-// 	return nil
-// }
-
-// // SetDebugInfoDetail sets debug info detail to the error details. If the error details already contain a debug info
-// // detail, it is overwritten.
-// func (e *Error) SetDebugInfo(detail string, stackEntries []string) error {
-// 	if detail == "" {
-// 		return nil
-// 	}
-
-// 	existing, err := e.findDebugInfo()
-// 	if errors.Is(err, errNotFound) {
-// 		detail := errdetails.DebugInfo{Detail: detail, StackEntries: stackEntries}
-// 		e.API, err = e.API.WithDetails(&detail)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-
-// 	existing.Detail = detail
-// 	existing.StackEntries = stackEntries
-// 	return nil
-// }
+// DomainType returns a unique error type based on the domain and reason. This is used to enable switch-case statements.
+func DomainType(domain, reason string) string {
+	return domain + reason
+}

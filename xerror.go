@@ -5,11 +5,13 @@ logged at a later time. It also provides a way to categorize errors into differe
 package xerror
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/runtime/protoiface"
@@ -407,6 +409,19 @@ func (xerr *Error) Status() *status.Status {
 	return status.FromProto(xerr.status.Proto())
 }
 
+// StatusProto returns the status proto contained in the error.
+func (xerr *Error) StatusProto() *spb.Status {
+	return xerr.status.Proto()
+}
+
+func (xerr *Error) StatusCode() codes.Code {
+	return xerr.status.Code()
+}
+
+func (xerr *Error) StatusMessage() string {
+	return xerr.status.Message()
+}
+
 // EqualsDomainError compares the error with the provided domain-specific error details (the domain and reason).
 // The reason is machine-readable and most importantly, it is unique within a particular domain of errors. This
 // method is used to check if a returned error is a particular domain-specific error. This is useful when decisions
@@ -450,6 +465,25 @@ func (xerr *Error) DomainType() string {
 	return DomainType(info.Domain, info.Reason)
 }
 
+// MarshalJSON marshals the error to JSON. This is only useful for testing purposes to be able to generate golden
+// files to be able to inspect the error in a human-readable format.
+func (xerr *Error) MarshalJSON() ([]byte, error) {
+	type out struct {
+		LogLevel      LogLevel    `json:"logLevel"`
+		Status        *spb.Status `json:"status"`
+		DetailsHidden bool        `json:"detailsHidden"`
+		RuntimeState  []Var       `json:"runtimeState"`
+	}
+	marshalthis := out{
+		LogLevel:      xerr.logLevel,
+		Status:        xerr.status.Proto(),
+		DetailsHidden: xerr.detailsHidden,
+		RuntimeState:  xerr.runtimeState,
+	}
+	return json.Marshal(marshalthis)
+}
+
+// WrappedError is a model that makes it easy to add more context to an error as it is passed up the call stack.
 type WrappedError struct {
 	Msg string
 	Err error

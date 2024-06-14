@@ -15,16 +15,16 @@ import (
 // This interceptor should be used in gRPC servers that return errors to external clients that are not trusted.
 // For example, if the server is a public API. If the server is an internal service that is
 // only called by other internal services, then it is recommended that it is not used.
-func UnaryDetailsRemoverInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+func UnaryDetailsRemoverInterceptor(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	// Call the handler
 	resp, err := handler(ctx, req)
 	if err != nil {
-		var e *xerror.Error
-		if !errors.As(err, &e) || !e.IsDetailsHidden() {
-			return resp, err
+		var xerr *xerror.Error
+		if !errors.As(err, &xerr) || !xerr.IsDetailsHidden() {
+			return nil, err
 		}
-		_ = e.RemoveSensitiveDetails()
-		return resp, err
+		_ = xerr.RemoveSensitiveDetails()
+		return nil, err
 	}
 	return resp, nil
 }

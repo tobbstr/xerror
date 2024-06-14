@@ -1,0 +1,19 @@
+{
+    "logLevel": 1,
+    "status": {
+        "code": 1,
+        "message": "request canceled by the client",
+        "details": [
+            {
+                "type_url": "type.googleapis.com/google.rpc.DebugInfo",
+                "value": "CgZsaW5lIDEKBmxpbmUgMhIXdGhpcyBpcyBhIGRlYnVnIG1lc3NhZ2U="
+            },
+            {
+                "type_url": "type.googleapis.com/google.rpc.ErrorInfo",
+                "value": "ChB0aGlzIGlzIGEgcmVhc29uEhh0aGlzIGlzIGFuIGVycm9yIG1lc3NhZ2UaDAoDa2V5EgV2YWx1ZQ=="
+            }
+        ]
+    },
+    "detailsHidden": false,
+    "runtimeState": null
+}

@@ -138,7 +138,7 @@ type NotFoundOptions struct {
 }
 
 func (_ factory) newNotFound(opts NotFoundOptions) *Error {
-	const msg = "requested resources not found"
+	const msg = "requested resource not found"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
 		logLevel: opts.LogLevel,
@@ -176,7 +176,7 @@ type AlreadyExistsOptions struct {
 func (f factory) newAlreadyExists(opts AlreadyExistsOptions) *Error {
 	const msg = "resource already exists"
 	e := &Error{
-		status:   *status.New(codes.NotFound, msg),
+		status:   *status.New(codes.AlreadyExists, msg),
 		logLevel: opts.LogLevel,
 	}
 
@@ -192,7 +192,7 @@ type AlreadyExistsBulkOptions struct {
 func (_ factory) newAlreadyExistsBulk(opts AlreadyExistsBulkOptions) *Error {
 	const msg = "resources already exist"
 	e := &Error{
-		status:   *status.New(codes.NotFound, msg),
+		status:   *status.New(codes.AlreadyExists, msg),
 		logLevel: opts.LogLevel,
 	}
 	e.AddResourceInfos(opts.ResourceInfos)

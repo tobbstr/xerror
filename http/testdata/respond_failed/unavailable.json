@@ -1,0 +1,7 @@
+{
+    "error": {
+        "code": 14,
+        "message": "service is currently unavailable",
+        "status": "UNAVAILABLE"
+    }
+}

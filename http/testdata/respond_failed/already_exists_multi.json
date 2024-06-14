@@ -1,21 +1,21 @@
 {
     "error": {
-        "code": 5,
+        "code": 6,
         "details": [
             {
                 "@type": "type.googleapis.com/google.rpc.ResourceInfo",
-                "description": "resource not found",
+                "description": "resource already exists",
                 "resourceName": "projects/12345/buckets/MyErrors",
                 "resourceType": "storage.v1.Bucket"
             },
             {
                 "@type": "type.googleapis.com/google.rpc.ResourceInfo",
-                "description": "resource not found",
+                "description": "resource already exists",
                 "resourceName": "projects/12345/iam/MyUser",
                 "resourceType": "iam.v1.User"
             }
         ],
-        "message": "requested resources not found",
-        "status": "NOT_FOUND"
+        "message": "resources already exist",
+        "status": "ALREADY_EXISTS"
     }
 }

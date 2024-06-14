@@ -1,11 +1,7 @@
 {
-    "code": 500,
-    "details": [
-        {
-            "detail": "more information about the error",
-            "type": "type.googleapis.com/google.rpc.DebugInfo"
-        }
-    ],
-    "message": "something unknown happened",
-    "status": "Unknown"
+    "error": {
+        "code": 2,
+        "message": "something unknown happened",
+        "status": "UNKNOWN"
+    }
 }

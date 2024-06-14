@@ -1,5 +1,7 @@
 {
-    "code": 499,
-    "message": "request canceled by the client",
-    "status": "Canceled"
+    "error": {
+        "code": 1,
+        "message": "request canceled by the client",
+        "status": "CANCELED"
+    }
 }

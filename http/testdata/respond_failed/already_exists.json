@@ -1,0 +1,15 @@
+{
+    "error": {
+        "code": 6,
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.ResourceInfo",
+                "description": "resource already exists",
+                "resourceName": "projects/12345/buckets/MyErrors",
+                "resourceType": "storage.v1.Bucket"
+            }
+        ],
+        "message": "resource already exists",
+        "status": "ALREADY_EXISTS"
+    }
+}

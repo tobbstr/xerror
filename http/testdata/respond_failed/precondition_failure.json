@@ -1,17 +1,19 @@
 {
-    "code": 400,
-    "details": [
-        {
-            "type": "type.googleapis.com/google.rpc.PreconditionFailure",
-            "violations": [
-                {
-                    "description": "user could not be updated because the user was changed since it was read",
-                    "subject": "example.com/v1/users/123",
-                    "type": "ErrVersionMismatch"
-                }
-            ]
-        }
-    ],
-    "message": "user could not be updated because the user was changed since it was read",
-    "status": "FailedPrecondition"
+    "error": {
+        "code": 9,
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.PreconditionFailure",
+                "violations": [
+                    {
+                        "description": "user could not be updated because the user was changed since it was read",
+                        "subject": "example.com/v1/users/123",
+                        "type": "ErrVersionMismatch"
+                    }
+                ]
+            }
+        ],
+        "message": "one or more request preconditions failed",
+        "status": "FAILED_PRECONDITION"
+    }
 }

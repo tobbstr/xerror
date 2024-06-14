@@ -6,13 +6,13 @@
                 "@type": "type.googleapis.com/google.rpc.BadRequest",
                 "fieldViolations": [
                     {
-                        "description": "must be greater than 0",
+                        "description": "must be between 18 and 65",
                         "field": "age"
                     }
                 ]
             }
         ],
-        "message": "one or more request arguments were invalid",
+        "message": "one or more request arguments were out of range",
         "status": "INVALID_ARGUMENT"
     }
 }

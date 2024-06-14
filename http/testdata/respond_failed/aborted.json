@@ -1,6 +1,6 @@
 {
     "error": {
-        "code": 7,
+        "code": 10,
         "details": [
             {
                 "@type": "type.googleapis.com/google.rpc.ErrorInfo",
@@ -9,10 +9,10 @@
                     "resource": "projects/123",
                     "service": "pubsub.googleapis.com"
                 },
-                "reason": "API_DISABLED"
+                "reason": "VERSION_MISMATCH"
             }
         ],
-        "message": "user does not have permission to access the resource",
-        "status": "PERMISSION_DENIED"
+        "message": "optimistic concurrency control conflict: resource revision mismatch",
+        "status": "ABORTED"
     }
 }

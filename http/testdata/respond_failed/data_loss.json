@@ -1,0 +1,7 @@
+{
+    "error": {
+        "code": 15,
+        "message": "unrecoverable data loss or corruption",
+        "status": "DATA_LOSS"
+    }
+}

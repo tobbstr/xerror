@@ -1,15 +1,18 @@
 {
-    "code": 401,
-    "details": [
-        {
-            "domain": "api.example.com",
-            "metadata": {
-                "err": "failed to parse JWT token"
-            },
-            "reason": "UNAUTHENTICATED",
-            "type": "type.googleapis.com/google.rpc.ErrorInfo"
-        }
-    ],
-    "message": "request could not be authenticated",
-    "status": "Unauthenticated"
+    "error": {
+        "code": 16,
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                "domain": "myservice.example.com",
+                "metadata": {
+                    "issue": "The length of the provided token is too short.",
+                    "token": "JWT"
+                },
+                "reason": "INVALID_TOKEN"
+            }
+        ],
+        "message": "failed to parse JWT token",
+        "status": "UNAUTHENTICATED"
+    }
 }

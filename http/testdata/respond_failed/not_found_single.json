@@ -1,17 +1,15 @@
 {
-    "code": 404,
-    "details": [
-        {
-            "resourceInfos": [
-                {
-                    "description": "resource not found",
-                    "resourceName": "User",
-                    "resourceType": "example.v1.User"
-                }
-            ],
-            "type": "type.googleapis.com/google.rpc.ResourceInfo"
-        }
-    ],
-    "message": "requested resource not found",
-    "status": "NotFound"
+    "error": {
+        "code": 5,
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.ResourceInfo",
+                "description": "resource not found",
+                "resourceName": "example.v1.User",
+                "resourceType": "User"
+            }
+        ],
+        "message": "requested resource not found",
+        "status": "NOT_FOUND"
+    }
 }

@@ -4,11 +4,11 @@ package xerror
 /*                          Server-initialized errors                         */
 /* -------------------------------------------------------------------------- */
 
-func NewInvalidArgument(opts BadRequestViolationOptions) *Error {
+func NewInvalidArgument(opts BadRequestOptions) *Error {
 	return maker.newInvalidArgument(opts)
 }
 
-func NewInvalidArguments(opts BadRequestViolationsOptions) *Error {
+func NewBatchInvalidArgument(opts BadRequestBatchOptions) *Error {
 	return maker.newInvalidArgumentErrors(opts)
 }
 
@@ -16,15 +16,15 @@ func NewPreconditionFailure(opts PreconditionFailureOptions) *Error {
 	return maker.newPreconditionFailure(opts)
 }
 
-func NewPreconditionFailures(opts PreconditionFailuresOptions) *Error {
+func NewBatchPreconditionFailure(opts PreconditionFailureBatchOptions) *Error {
 	return maker.newPreconditionFailures(opts)
 }
 
-func NewOutOfRange(opts BadRequestViolationOptions) *Error {
+func NewOutOfRange(opts BadRequestOptions) *Error {
 	return maker.newOutOfRangeError(opts)
 }
 
-func NewOutOfRangeBulk(opts BadRequestViolationsOptions) *Error {
+func NewBatchOutOfRange(opts BadRequestBatchOptions) *Error {
 	return maker.newOutOfRangeErrors(opts)
 }
 
@@ -40,8 +40,8 @@ func NewNotFound(opts NotFoundOptions) *Error {
 	return maker.newNotFound(opts)
 }
 
-func NewNotFoundBulk(opts NotFoundBulkOptions) *Error {
-	return maker.newNotFoundBulk(opts)
+func NewBatchNotFound(opts NotFoundBatchOptions) *Error {
+	return maker.newBatchNotFound(opts)
 }
 
 func NewAborted(opts ErrorInfoOptions) *Error {
@@ -52,27 +52,31 @@ func NewAlreadyExists(opts AlreadyExistsOptions) *Error {
 	return maker.newAlreadyExists(opts)
 }
 
-func NewAlreadyExistsBulk(opts AlreadyExistsBulkOptions) *Error {
-	return maker.newAlreadyExistsBulk(opts)
+func NewBatchAlreadyExists(opts AlreadyExistsBatchOptions) *Error {
+	return maker.newBatchAlreadyExists(opts)
 }
 
 func NewResourceExhausted(opts ResourceExhaustedOptions) *Error {
 	return maker.newResourceExhausted(opts)
 }
 
+func NewBatchResourceExhausted(opts ResourceExhaustedBatchOptions) *Error {
+	return maker.newBatchResourceExhausted(opts)
+}
+
 func NewCanceled(logLevel LogLevel) *Error {
 	return maker.newCanceledError(logLevel)
 }
 
-func NewDataLoss(opts ErrorWithHiddenDetailsOptions) *Error {
+func NewDataLoss(opts SimpleOptions) *Error {
 	return maker.newDataLoss(opts)
 }
 
-func NewUnknown(opts ErrorWithHiddenDetailsOptions) *Error {
+func NewUnknown(opts SimpleOptions) *Error {
 	return maker.newUnknown(opts)
 }
 
-func NewInternal(opts ErrorWithHiddenDetailsOptions) *Error {
+func NewInternal(opts SimpleOptions) *Error {
 	return maker.newInternalError(opts)
 }
 
@@ -80,10 +84,10 @@ func NewNotImplemented(logLevel LogLevel) *Error {
 	return maker.newNotImplemented(logLevel)
 }
 
-func NewUnavailable(opts ErrorWithHiddenDetailsOptions) *Error {
+func NewUnavailable(opts SimpleOptions) *Error {
 	return maker.newUnavailable(opts)
 }
 
-func NewDeadlineExceeded(opts ErrorWithHiddenDetailsOptions) *Error {
+func NewDeadlineExceeded(opts SimpleOptions) *Error {
 	return maker.newDeadlineExceeded(opts)
 }

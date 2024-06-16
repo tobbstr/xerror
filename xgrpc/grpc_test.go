@@ -1,4 +1,4 @@
-package grpc
+package xgrpc
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestXErrorFrom(t *testing.T) {
+func TestErrorFrom(t *testing.T) {
 	type args struct {
 		err error
 	}
@@ -30,7 +30,7 @@ func TestXErrorFrom(t *testing.T) {
 		{
 			name: "err is not of type status.Status",
 			args: args{err: errors.New("some error")},
-			want: xerror.NewUnknown(xerror.ErrorWithHiddenDetailsOptions{
+			want: xerror.NewUnknown(xerror.SimpleOptions{
 				Error: errors.New("some error"),
 			}),
 		},
@@ -38,7 +38,7 @@ func TestXErrorFrom(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			/* ---------------------------------- When ---------------------------------- */
-			got := XErrorFrom(tt.args.err)
+			got := ErrorFrom(tt.args.err)
 
 			/* ---------------------------------- Then ---------------------------------- */
 			require.Equal(t, tt.want.StatusCode(), got.StatusCode())
@@ -101,7 +101,7 @@ func TestUnaryDetailsRemoverInterceptor(t *testing.T) {
 			args := args{ctx: context.Background(), handler: tt.given.handler}
 
 			/* ---------------------------------- When ---------------------------------- */
-			got, err := UnaryDetailsRemoverInterceptor(args.ctx, args.req, args.info, args.handler)
+			got, err := UnaryXErrorInterceptor(args.ctx, args.req, args.info, args.handler)
 
 			/* ---------------------------------- Then ---------------------------------- */
 			require := require.New(t)

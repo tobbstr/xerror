@@ -170,7 +170,7 @@ func (xerr *Error) AddPreconditionViolations(violations []PreconditionViolation)
 
 // SetErrorInfo sets error info details to the error details. If the error details already contain error info
 // details, they are overwritten. If the domain is empty, the domain is set to the package's default domain which
-// should be set at startup-time by calling the Init() function. A non-empty domain is required.
+// should be set at startup-time by calling the Init() function.
 //
 // It is recommended to include an error info detail for the following error types:
 //   - UNAUTHENTICATED
@@ -320,6 +320,12 @@ func (xerr *Error) HideDetails() *Error {
 	return xerr
 }
 
+// ShowDetails marks the error as having shown details. This is the inverse of HideDetails.
+func (xerr *Error) ShowDetails() *Error {
+	xerr.detailsHidden = false
+	return xerr
+}
+
 // LogLevel returns the log level of the error.
 func (xerr *Error) LogLevel() LogLevel {
 	return xerr.logLevel
@@ -422,7 +428,7 @@ func (xerr *Error) StatusMessage() string {
 	return xerr.status.Message()
 }
 
-// EqualsDomainError compares the error with the provided domain-specific error details (the domain and reason).
+// IsDomainError compares the error with the provided domain-specific error details (the domain and reason).
 // The reason is machine-readable and most importantly, it is unique within a particular domain of errors. This
 // method is used to check if a returned error is a particular domain-specific error. This is useful when decisions
 // need to be made based on the error type.
@@ -434,12 +440,12 @@ func (xerr *Error) StatusMessage() string {
 //
 //	 err := othersystempb.SomeMethod(ctx, req)
 //	 if err != nil {
-//		 xerr := grpc.XErrorFrom(err)
-//		 if xerr.EqualsDomainError(othersystemerror.Domain, othersystemerror.NO_STOCK) {
+//		 xerr := xgrpc.ErrorFrom(err)
+//		 if xerr.IsDomainError(othersystem.Domain, othersystem.NO_STOCK) {
 //			 requestMoreStock() // decision based on the error type
 //		 }
 //	 }
-func (xerr *Error) EqualsDomainError(domain, reason string) bool {
+func (xerr *Error) IsDomainError(domain, reason string) bool {
 	info, err := xerr.findErrorInfo()
 	if errors.Is(err, errNotFound) {
 		return false
@@ -559,4 +565,17 @@ func Wrap(err error, msg string) error {
 // DomainType returns a unique error type based on the domain and reason. This is used to enable switch-case statements.
 func DomainType(domain, reason string) string {
 	return domain + reason
+}
+
+// From returns an Error instance from an error. If the error is not an Error instance, then it is an unexpected error
+// and should be logged, so it can be discovered where in the code the error isn't correctly handled.
+func From(err error) *Error {
+	var xerr *Error
+	if !errors.As(err, &xerr) {
+		return &Error{
+			logLevel: LogLevelError,
+			status:   *status.New(codes.Unknown, err.Error()),
+		}
+	}
+	return xerr
 }

@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package example.v1;
-
-import "google/rpc/error_details.proto";
-
-option go_package = "example/v1";

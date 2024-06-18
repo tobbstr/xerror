@@ -12,12 +12,33 @@ The error model it uses is the [Google Cloud APIs error model](https://google.ai
    return the error up the call stack, but with more context at each hop.
 3. Adding any number of runtime states (variable names and their values) to the error for logging further up the
    call stack.
-4. Enables servers to both serve gRPC and HTTP clients without having to translate application errors into gRPC-
-   specific and HTTP-specific variants.
+4. Enables servers to both serve gRPC and HTTP clients without having to translate application errors into gRPC- and
+   HTTP-specific variants.
 5. Enables servers to hide sensitive data in their error responses.
 6. Provides an easy way to set the log-level which can be used by logging libraries so that the errors are logged
    at the desired level.
-7. Offers error responses for both gRPC and HTTP that are compliant with Google Cloud AIPs (API Improvement Proposals).
+7. Offers error responses for both gRPC and HTTP that are compliant with [Google Cloud AIP-193](https://google.aip.dev/193) (API Improvement Proposals).
+
+## Usage
+
+Add a call to `xerror.Init()` in your main.go file and run `go mod tidy` optionally followed by `go mod vendor` if
+your Go module vendors its dependencies. That call initialises the xerror package. It globally sets the "domain" value
+so we don't have to specify it every time we set an [ErrorInfo](https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto#L51) detail in our error. The domain value should be either the name of your service or its domain
+name.
+
+```go
+// main.go
+
+import "github.com/tobbstr/xerror"
+
+func main() {
+    xerror.Init("pubsub.googleapis.com") // replace this string with your service name or service domain as in the example
+}
+```
+
+Then you're all set! ✅
+
+See the next sections for how to use it for different purposes.
 
 ## Error logging
 
@@ -107,7 +128,7 @@ return xerror.From(err).SetLogLevel(xerror.LogLevelWarn) // This sets a warning 
 ## Errors originating from your system
 
 This section demonstrates how to work with errors that happen in your system. Such as when validating arguments,
-or checking preconditions etc. In those cases, you're not inheriting the error from some library or system, but rather
+or checking preconditions etc. In those cases, you're not returned the error from some library or system, but rather
 you're the one creating the root error. It's then up to you to classify the error correctly (invalid argument,
 aborted, etc.).
 
@@ -137,6 +158,42 @@ For example, the constructor for the type `unknown` is as follows:
 
 ```go
 xerror.NewUnknown(SimpleOptions{Error: errors.New("something unknown happened")})
+```
+
+### Error type organisation
+
+Below an overview is presented that visualises how the the error types are organised. As can be seen, some error types
+are reserved for problems pertaining to a request, and some for problems with the server. Some however appear in both
+cases. A few of them are also inside other boxes, for example the `NOT_FOUND` error. The reason it's inside the
+`INVALID_ARGUMENT` box, is that it's a specialized version of an `INVALID_ARGUMENT`.
+
+```mermaid
+flowchart LR
+subgraph "Problems with the request"
+    CANCELED
+    subgraph INVALID_ARGUMENT
+        OUT_OF_RANGE
+        NOT_FOUND
+        DATA_LOSS
+    end
+    PERMISSION_DENIED
+    UNAUTHENTICATED
+end
+
+subgraph "Problems with the Server"
+    DATA_LOSS_2["DATA_LOSS"]
+    subgraph FAILED_PRECONDITION
+        ABORTED
+        ALREADY_EXISTS
+        RESOURCE_EXHAUSTED
+    end
+    UNKNOWN
+    INTERNAL
+    NOT_IMPLEMENTED
+    UNAVAILABLE
+    DEADLINE_EXCEEDED
+end
+
 ```
 
 ## Errors originating from external systems
@@ -170,9 +227,9 @@ Does Google Cloud APIs error model support this usecase? Yes, it does. The way i
 ```json
 {
   "error": {
-    "code": 400,
-    "message": "The order couldn't be fulfilled. One of more preconditions were not fulfilled",
-    "status": "FAILED_PRECONDITION",
+    "code": 8,
+    "message": "The order couldn't be fulfilled. The requested item is out of stock",
+    "status": "RESOURCE_EXHAUSTED",
     "details": [
       {
         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
@@ -213,6 +270,31 @@ enum definitions](https://github.com/googleapis/googleapis/blob/master/google/ap
 
 ## Retries
 
+Whenever a function/method or external call etc., is made, it may fail for any number of reasons. For some of them
+retrying is futile, but for some it could be worth an attempt or two.
+
+[Retries can be categorised into two types](https://cloud.google.com/apis/design/errors#retrying_errors). One is the retry of the immediate call that failed. The other is the
+retry at a higher level in the code. A higher level means futher up the call stack, which could mean a retry of
+a whole transaction.
+
+These two categories are supported by the Google Cloud APIs error model, by inspection of the error status' code.
+This library reduces the cognitive load of developers by not requiring them to remember which code means that
+retries could be attempted.
+
+Two methods are provided that map to these retry categories:
+
+```go
+resp, err := orderClientpb.OrderPencils()
+if err != nil {
+    xerr := xgrpc.ErrorFrom(err)
+    if xerr.IsDirectlyRetryable() {
+        // implementation skipped for brevity
+    } else if xerr.IsRetryableAtHigherLevel() {
+        // implementation skipped for brevity
+    }
+}
+```
+
 ## Error propagation outside of your domain or bounded context
 
 This section discusses when errors are to be returned to callers of your service. When that happens the first thing
@@ -245,7 +327,17 @@ if err != nil {
 }
 ```
 
-When dealing with untrusted callers of type (1) then the error may be propagated to the caller "as is", but it's
-recommended to strip it of sensitive information. For untrusted callers of type (2), it's [recommended](https://cloud.google.com/apis/design/errors#propagating_errors) the error
-is translated into a generic "internal server" error without any additional information. This is easily achieved by
-using the provided constructors mentioned [here](#error-constructors).
+When dealing with untrusted callers of type (1) then the error may be propagated to the caller "as is" as in the
+example above, but it's recommended to strip it of sensitive information. For untrusted callers of type (2), it's
+[recommended](https://cloud.google.com/apis/design/errors#propagating_errors) the error is translated into a generic "internal server" error without any additional information. This is easily achieved by
+using the provided constructors mentioned [here](#error-constructors). See the example below.
+
+```go
+resp, err := orderClientpb.OrderPencils()
+if err != nil {
+    // Returns an INTERNAL error no matter what the external call returned.
+    return xerror.NewInternal(SimpleOptions{Error: err}).
+        // marks the xerror as having sensistive details so it will be removed before returning it to the caller
+        HideDetails()
+}
+```

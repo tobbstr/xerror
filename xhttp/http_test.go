@@ -48,7 +48,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "invalid arguments",
 			given: given{
-				err: xerror.NewBatchInvalidArgument(xerror.BadRequestBatchOptions{
+				err: xerror.NewInvalidArgumentBatch(xerror.BadRequestBatchOptions{
 					Violations: []xerror.BadRequestViolation{
 						{Field: "age", Description: "must be greater than 0"},
 						{Field: "name", Description: "cannot be empty"},
@@ -141,7 +141,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "not found (multi)",
 			given: given{
-				err: xerror.NewBatchNotFound(xerror.NotFoundBatchOptions{
+				err: xerror.NewNotFoundBatch(xerror.NotFoundBatchOptions{
 					ResourceInfos: []xerror.ResourceInfo{
 						{
 							Description:  "resource not found",
@@ -197,7 +197,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "already exists (multi)",
 			given: given{
-				err: xerror.NewBatchAlreadyExists(xerror.AlreadyExistsBatchOptions{
+				err: xerror.NewAlreadyExistsBatch(xerror.AlreadyExistsBatchOptions{
 					ResourceInfos: []xerror.ResourceInfo{
 						{
 							Description:  "resource already exists",
@@ -220,7 +220,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "resource exhausted",
 			given: given{
-				err: xerror.NewResourceExhausted(xerror.ResourceExhaustedOptions{
+				err: xerror.NewQuotaFailure(xerror.QuotaFailureOptions{
 					Error: errors.New("the request for this project exceeds the available quota."),
 					QuotaViolation: xerror.QuotaViolation{
 						Subject:     "projects/123",
@@ -246,7 +246,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "data loss",
 			given: given{
-				err: xerror.NewDataLoss(xerror.SimpleOptions{
+				err: xerror.NewServerDataLoss(xerror.SimpleOptions{
 					Error: errors.New("unrecoverable data loss or corruption"),
 				}),
 			},

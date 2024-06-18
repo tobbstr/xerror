@@ -189,7 +189,7 @@ type AlreadyExistsBatchOptions struct {
 	LogLevel      LogLevel
 }
 
-func (_ factory) newBatchAlreadyExists(opts AlreadyExistsBatchOptions) *Error {
+func (_ factory) newAlreadyExistsBatch(opts AlreadyExistsBatchOptions) *Error {
 	const msg = "resources already exist"
 	e := &Error{
 		status:   *status.New(codes.AlreadyExists, msg),
@@ -199,13 +199,13 @@ func (_ factory) newBatchAlreadyExists(opts AlreadyExistsBatchOptions) *Error {
 	return e
 }
 
-type ResourceExhaustedOptions struct {
+type QuotaFailureOptions struct {
 	Error          error
 	QuotaViolation QuotaViolation
 	LogLevel       LogLevel
 }
 
-func (_ factory) newResourceExhausted(opts ResourceExhaustedOptions) *Error {
+func (_ factory) newQuotaFailure(opts QuotaFailureOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
 		logLevel: opts.LogLevel,
@@ -215,13 +215,13 @@ func (_ factory) newResourceExhausted(opts ResourceExhaustedOptions) *Error {
 	return e
 }
 
-type ResourceExhaustedBatchOptions struct {
+type QuotaFailureBatchOptions struct {
 	Error           error
 	QuotaViolations []QuotaViolation
 	LogLevel        LogLevel
 }
 
-func (_ factory) newBatchResourceExhausted(opts ResourceExhaustedBatchOptions) *Error {
+func (_ factory) newQuotaFailureBatch(opts QuotaFailureBatchOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
 		logLevel: opts.LogLevel,
@@ -229,6 +229,10 @@ func (_ factory) newBatchResourceExhausted(opts ResourceExhaustedBatchOptions) *
 
 	_ = e.AddQuotaViolations(opts.QuotaViolations)
 	return e
+}
+
+func (_ factory) newResourceExhausted(opts ErrorInfoOptions) *Error {
+	return maker.newErrorInfoError(codes.ResourceExhausted, opts)
 }
 
 func (_ factory) newCanceledError(logLevel LogLevel) *Error {
@@ -245,8 +249,12 @@ type SimpleOptions struct {
 	LogLevel LogLevel
 }
 
-func (f factory) newDataLoss(opts SimpleOptions) *Error {
+func (f factory) newServerDataLoss(opts SimpleOptions) *Error {
 	return f.newErrorWithHiddenDetails(codes.DataLoss, opts)
+}
+
+func (_ factory) newRequestDataLoss(opts ErrorInfoOptions) *Error {
+	return maker.newErrorInfoError(codes.DataLoss, opts)
 }
 
 func (f factory) newUnknown(opts SimpleOptions) *Error {

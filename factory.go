@@ -30,24 +30,24 @@ type BadRequestViolation struct {
 	Field, Description string
 }
 
-type BadRequestViolationOptions struct {
+type BadRequestOptions struct {
 	Violation BadRequestViolation
 	LogLevel  LogLevel
 }
 
-func (f factory) newInvalidArgument(opts BadRequestViolationOptions) *Error {
+func (f factory) newInvalidArgument(opts BadRequestOptions) *Error {
 	const msg = "one or more request arguments were invalid"
 	return f.newBadRequest(msg, opts)
 }
 
-type BadRequestViolationsOptions struct {
+type BadRequestBatchOptions struct {
 	Violations []BadRequestViolation
 	LogLevel   LogLevel
 }
 
-func (f factory) newInvalidArgumentErrors(opts BadRequestViolationsOptions) *Error {
+func (f factory) newInvalidArgumentErrors(opts BadRequestBatchOptions) *Error {
 	const msg = "one or more request arguments were invalid"
-	return f.newBadRequestBulk(msg, opts)
+	return f.newBatchBadRequest(msg, opts)
 }
 
 type PreconditionViolation struct {
@@ -64,33 +64,33 @@ func (f factory) newPreconditionFailure(opts PreconditionFailureOptions) *Error 
 	e := &Error{
 		status: *status.New(codes.FailedPrecondition, msg),
 	}
-	e.AddPreconditionViolations([]PreconditionViolation{opts.Violation})
+	_ = e.AddPreconditionViolations([]PreconditionViolation{opts.Violation})
 	return e
 }
 
-type PreconditionFailuresOptions struct {
+type PreconditionFailureBatchOptions struct {
 	Violations []PreconditionViolation
 	LogLevel   LogLevel
 }
 
-func (f factory) newPreconditionFailures(opts PreconditionFailuresOptions) *Error {
+func (f factory) newPreconditionFailures(opts PreconditionFailureBatchOptions) *Error {
 	const msg = "one or more request preconditions failed"
 	e := &Error{
 		status: *status.New(codes.FailedPrecondition, msg),
 	}
 
-	e.AddPreconditionViolations(opts.Violations)
+	_ = e.AddPreconditionViolations(opts.Violations)
 	return e
 }
 
-func (f factory) newOutOfRangeError(opts BadRequestViolationOptions) *Error {
+func (f factory) newOutOfRangeError(opts BadRequestOptions) *Error {
 	const msg = "one or more request arguments were out of range"
 	return f.newBadRequest(msg, opts)
 }
 
-func (f factory) newOutOfRangeErrors(opts BadRequestViolationsOptions) *Error {
+func (f factory) newOutOfRangeErrors(opts BadRequestBatchOptions) *Error {
 	const msg = "one or more request arguments were out of range"
-	return f.newBadRequestBulk(msg, opts)
+	return f.newBatchBadRequest(msg, opts)
 }
 
 type ErrorInfoOptions struct {
@@ -144,23 +144,23 @@ func (_ factory) newNotFound(opts NotFoundOptions) *Error {
 		logLevel: opts.LogLevel,
 	}
 
-	e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
+	_ = e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
 	return e
 }
 
-type NotFoundBulkOptions struct {
+type NotFoundBatchOptions struct {
 	ResourceInfos []ResourceInfo
 	LogLevel      LogLevel
 }
 
-func (_ factory) newNotFoundBulk(opts NotFoundBulkOptions) *Error {
+func (_ factory) newBatchNotFound(opts NotFoundBatchOptions) *Error {
 	const msg = "requested resources not found"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
 		logLevel: opts.LogLevel,
 	}
 
-	e.AddResourceInfos(opts.ResourceInfos)
+	_ = e.AddResourceInfos(opts.ResourceInfos)
 	return e
 }
 
@@ -180,55 +180,59 @@ func (f factory) newAlreadyExists(opts AlreadyExistsOptions) *Error {
 		logLevel: opts.LogLevel,
 	}
 
-	e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
+	_ = e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
 	return e
 }
 
-type AlreadyExistsBulkOptions struct {
+type AlreadyExistsBatchOptions struct {
 	ResourceInfos []ResourceInfo
 	LogLevel      LogLevel
 }
 
-func (_ factory) newAlreadyExistsBulk(opts AlreadyExistsBulkOptions) *Error {
+func (_ factory) newAlreadyExistsBatch(opts AlreadyExistsBatchOptions) *Error {
 	const msg = "resources already exist"
 	e := &Error{
 		status:   *status.New(codes.AlreadyExists, msg),
 		logLevel: opts.LogLevel,
 	}
-	e.AddResourceInfos(opts.ResourceInfos)
+	_ = e.AddResourceInfos(opts.ResourceInfos)
 	return e
 }
 
-type ResourceExhaustedOptions struct {
+type QuotaFailureOptions struct {
 	Error          error
 	QuotaViolation QuotaViolation
 	LogLevel       LogLevel
 }
 
-func (_ factory) newResourceExhausted(opts ResourceExhaustedOptions) *Error {
+func (_ factory) newQuotaFailure(opts QuotaFailureOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
 		logLevel: opts.LogLevel,
 	}
 
-	e.AddQuotaViolations([]QuotaViolation{opts.QuotaViolation})
+	_ = e.AddQuotaViolations([]QuotaViolation{opts.QuotaViolation})
 	return e
 }
 
-type ResourcesExhaustedOptions struct {
+type QuotaFailureBatchOptions struct {
 	Error           error
 	QuotaViolations []QuotaViolation
 	LogLevel        LogLevel
 }
 
-func (_ factory) newResourcesExhausted(opts ResourcesExhaustedOptions) *Error {
+func (_ factory) newQuotaFailureBatch(opts QuotaFailureBatchOptions) *Error {
 	e := &Error{
 		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
 		logLevel: opts.LogLevel,
 	}
 
-	e.AddQuotaViolations(opts.QuotaViolations)
+	_ = e.AddQuotaViolations(opts.QuotaViolations)
 	return e
+}
+
+func (_ factory) newResourceExhausted(opts ErrorInfoOptions) *Error {
+	return maker.newErrorInfoError(codes.ResourceExhausted, opts)
 }
 
 func (_ factory) newCanceledError(logLevel LogLevel) *Error {
@@ -240,20 +244,24 @@ func (_ factory) newCanceledError(logLevel LogLevel) *Error {
 	return e
 }
 
-type ErrorWithHiddenDetailsOptions struct {
+type SimpleOptions struct {
 	Error    error
 	LogLevel LogLevel
 }
 
-func (f factory) newDataLoss(opts ErrorWithHiddenDetailsOptions) *Error {
+func (f factory) newServerDataLoss(opts SimpleOptions) *Error {
 	return f.newErrorWithHiddenDetails(codes.DataLoss, opts)
 }
 
-func (f factory) newUnknown(opts ErrorWithHiddenDetailsOptions) *Error {
+func (_ factory) newRequestDataLoss(opts ErrorInfoOptions) *Error {
+	return maker.newErrorInfoError(codes.DataLoss, opts)
+}
+
+func (f factory) newUnknown(opts SimpleOptions) *Error {
 	return f.newErrorWithHiddenDetails(codes.Unknown, opts)
 }
 
-func (f factory) newInternalError(opts ErrorWithHiddenDetailsOptions) *Error {
+func (f factory) newInternalError(opts SimpleOptions) *Error {
 	return f.newErrorWithHiddenDetails(codes.Internal, opts)
 }
 
@@ -266,33 +274,47 @@ func (f factory) newNotImplemented(logLevel LogLevel) *Error {
 	return e
 }
 
-func (f factory) newUnavailable(opts ErrorWithHiddenDetailsOptions) *Error {
+func (f factory) newUnavailable(opts SimpleOptions) *Error {
 	return f.newErrorWithHiddenDetails(codes.Unavailable, opts)
 }
 
-func (f factory) newDeadlineExceeded(opts ErrorWithHiddenDetailsOptions) *Error {
+func (f factory) newDeadlineExceeded(opts SimpleOptions) *Error {
 	return f.newErrorWithHiddenDetails(codes.DeadlineExceeded, opts)
 }
 
 /* ------------------------- Factory helper methods ------------------------- */
 
-func (_ factory) newBadRequest(msg string, opts BadRequestViolationOptions) *Error {
+func (_ factory) newBadRequest(msg string, opts BadRequestOptions) *Error {
+	var logLevel LogLevel
+	switch opts.LogLevel {
+	case LogLevelUnspecified:
+		logLevel = LogLevelInfo
+	default:
+		logLevel = opts.LogLevel
+	}
 	e := &Error{
 		status:   *status.New(codes.InvalidArgument, msg),
-		logLevel: opts.LogLevel,
+		logLevel: logLevel,
 	}
 
-	e.AddBadRequestViolations([]BadRequestViolation{opts.Violation})
+	_ = e.AddBadRequestViolations([]BadRequestViolation{opts.Violation})
 	return e
 }
 
-func (_ factory) newBadRequestBulk(msg string, opts BadRequestViolationsOptions) *Error {
+func (_ factory) newBatchBadRequest(msg string, opts BadRequestBatchOptions) *Error {
+	var logLevel LogLevel
+	switch opts.LogLevel {
+	case LogLevelUnspecified:
+		logLevel = LogLevelInfo
+	default:
+		logLevel = opts.LogLevel
+	}
 	e := &Error{
 		status:   *status.New(codes.InvalidArgument, msg),
-		logLevel: opts.LogLevel,
+		logLevel: logLevel,
 	}
 
-	e.AddBadRequestViolations(opts.Violations)
+	_ = e.AddBadRequestViolations(opts.Violations)
 	return e
 }
 
@@ -301,14 +323,24 @@ func (f factory) newErrorInfoError(code codes.Code, opts ErrorInfoOptions) *Erro
 		status:   *status.New(code, opts.Error.Error()),
 		logLevel: opts.LogLevel,
 	}
-	e.SetErrorInfo(f.domain, opts.Reason, opts.Metadata)
+	_ = e.SetErrorInfo(f.domain, opts.Reason, opts.Metadata)
 	return e
 }
 
-func (_ factory) newErrorWithHiddenDetails(code codes.Code, opts ErrorWithHiddenDetailsOptions) *Error {
+func (_ factory) newErrorWithHiddenDetails(code codes.Code, opts SimpleOptions) *Error {
+	if opts.Error == nil {
+		return nil
+	}
+	var logLevel LogLevel
+	switch opts.LogLevel {
+	case LogLevelUnspecified:
+		logLevel = LogLevelError
+	default:
+		logLevel = opts.LogLevel
+	}
 	return &Error{
 		status:        *status.New(code, opts.Error.Error()),
-		logLevel:      opts.LogLevel,
+		logLevel:      logLevel,
 		detailsHidden: true,
 	}
 }

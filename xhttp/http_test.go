@@ -1,4 +1,4 @@
-package http
+package xhttp
 
 import (
 	"encoding/json"
@@ -35,7 +35,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "invalid argument",
 			given: given{
-				err: xerror.NewInvalidArgument(xerror.BadRequestViolationOptions{
+				err: xerror.NewInvalidArgument(xerror.BadRequestOptions{
 					Violation: xerror.BadRequestViolation{Field: "age", Description: "must be greater than 0"},
 					LogLevel:  xerror.LogLevelError,
 				}),
@@ -48,7 +48,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "invalid arguments",
 			given: given{
-				err: xerror.NewInvalidArguments(xerror.BadRequestViolationsOptions{
+				err: xerror.NewInvalidArgumentBatch(xerror.BadRequestBatchOptions{
 					Violations: []xerror.BadRequestViolation{
 						{Field: "age", Description: "must be greater than 0"},
 						{Field: "name", Description: "cannot be empty"},
@@ -79,7 +79,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "out of range",
 			given: given{
-				err: xerror.NewOutOfRange(xerror.BadRequestViolationOptions{
+				err: xerror.NewOutOfRange(xerror.BadRequestOptions{
 					Violation: xerror.BadRequestViolation{Field: "age", Description: "must be between 18 and 65"},
 				}),
 			},
@@ -141,7 +141,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "not found (multi)",
 			given: given{
-				err: xerror.NewNotFoundBulk(xerror.NotFoundBulkOptions{
+				err: xerror.NewNotFoundBatch(xerror.NotFoundBatchOptions{
 					ResourceInfos: []xerror.ResourceInfo{
 						{
 							Description:  "resource not found",
@@ -197,7 +197,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "already exists (multi)",
 			given: given{
-				err: xerror.NewAlreadyExistsBulk(xerror.AlreadyExistsBulkOptions{
+				err: xerror.NewAlreadyExistsBatch(xerror.AlreadyExistsBatchOptions{
 					ResourceInfos: []xerror.ResourceInfo{
 						{
 							Description:  "resource already exists",
@@ -220,7 +220,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "resource exhausted",
 			given: given{
-				err: xerror.NewResourceExhausted(xerror.ResourceExhaustedOptions{
+				err: xerror.NewQuotaFailure(xerror.QuotaFailureOptions{
 					Error: errors.New("the request for this project exceeds the available quota."),
 					QuotaViolation: xerror.QuotaViolation{
 						Subject:     "projects/123",
@@ -246,7 +246,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "data loss",
 			given: given{
-				err: xerror.NewDataLoss(xerror.ErrorWithHiddenDetailsOptions{
+				err: xerror.NewServerDataLoss(xerror.SimpleOptions{
 					Error: errors.New("unrecoverable data loss or corruption"),
 				}),
 			},
@@ -258,7 +258,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "unknown",
 			given: given{
-				err: xerror.NewUnknown(xerror.ErrorWithHiddenDetailsOptions{
+				err: xerror.NewUnknown(xerror.SimpleOptions{
 					Error: errors.New("something unknown happened"),
 				}),
 			},
@@ -270,7 +270,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "internal",
 			given: given{
-				err: xerror.NewInternal(xerror.ErrorWithHiddenDetailsOptions{
+				err: xerror.NewInternal(xerror.SimpleOptions{
 					Error: errors.New("internal server error"),
 				}),
 			},
@@ -292,7 +292,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "unavailable",
 			given: given{
-				err: xerror.NewUnavailable(xerror.ErrorWithHiddenDetailsOptions{
+				err: xerror.NewUnavailable(xerror.SimpleOptions{
 					Error: errors.New("service is currently unavailable"),
 				}),
 			},
@@ -304,7 +304,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "deadline exceeded",
 			given: given{
-				err: xerror.NewDeadlineExceeded(xerror.ErrorWithHiddenDetailsOptions{
+				err: xerror.NewDeadlineExceeded(xerror.SimpleOptions{
 					Error: errors.New("request timed out"),
 				}),
 			},
@@ -316,7 +316,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "hide details",
 			given: given{
-				err: xerror.NewDeadlineExceeded(xerror.ErrorWithHiddenDetailsOptions{
+				err: xerror.NewDeadlineExceeded(xerror.SimpleOptions{
 					Error: errors.New("request timed out"),
 				}).
 					SetDebugInfo("this is a debug message", []string{"line 1", "line 2"}).

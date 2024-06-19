@@ -193,8 +193,14 @@ subgraph "Problems with the Server"
     UNAVAILABLE
     DEADLINE_EXCEEDED
 end
-
 ```
+
+### Error guide
+
+With all of these error types how can I know which one to use? Just call the `xerror.ErrorGuide()` and read the
+comments to the options that appear in your intellisense. Although errors can be initialised using the error guide,
+it's only meant to guide you to the right error type. Once you know which one you need, you can use the available
+constructor functions such as `xerror.NewNotFound()`.
 
 ## Errors originating from external systems
 
@@ -339,5 +345,58 @@ if err != nil {
     return xerror.NewInternal(SimpleOptions{Error: err}).
         // marks the xerror as having sensistive details so it will be removed before returning it to the caller
         HideDetails()
+}
+```
+
+## Using xerrors in HTTP APIs
+
+Isn't it a hassle having to support multiple error models? One for the application and another for the HTTP API?
+Well, with xerror you don't have to. The xerror package has a subpackage called `xhttp`, which contains a single
+function `RespondFailed(w http.ResponseWriter, err error)`.
+
+That function expects an xerror and if that is passed to it, then it gets translated into a JSON-formatted
+representation of a Google Cloud APIs error model. For example, when an xerror of type "ABORTED" is passed to the
+"RespondFailed()" function then the body in the HTTP response will look similar to this:
+
+```json
+{
+    "error": {
+        "code": 10,
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                "domain": "myservice.example.com",
+                "metadata": {
+                    "resource": "projects/123",
+                    "service": "pubsub.googleapis.com"
+                },
+                "reason": "VERSION_MISMATCH"
+            }
+        ],
+        "message": "optimistic concurrency control conflict: resource revision mismatch",
+        "status": "ABORTED"
+    }
+}
+```
+
+## Using xerrors in gRPC APIs
+
+Just like for HTTP APIs, xerrors support gRPC APIs as well. The difference is that, for gRPC, an interceptor
+has to be registered in the server. Once that's done then one can simply return xerrors in the gRPC endpoint
+implementations.
+
+```go
+// main.go
+
+import (
+    "google.golang.org/grpc"
+    "github.com/tobbstr/xerror/xgrpc"
+)
+
+func main() {
+    // Create a gRPC server instance with the interceptor
+    server := grpc.NewServer(
+        grpc.UnaryInterceptor(xgrpc.UnaryXErrorInterceptor),
+    )
 }
 ```

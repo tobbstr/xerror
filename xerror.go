@@ -21,13 +21,28 @@ import (
 TODO:
 	1. Make it easy to consume gRPC errors
 	2. Make it easy to consume HTTP errors by generating typescript models from status.Status
-	3. Make it easy to produce HTTP errors
-	4. Make it easy to respond with HTTP errors
 	5. Make it easy to produce gRPC errors
 	6. Make it easy to respond with gRPC errors (unaryinterceptor)
 */
 
 var errNotFound = errors.New("something was not found")
+
+// Optional is a type used to model a value that may or may not be present. It is used to model the return
+// value of a function that may return a value or not. It is used to avoid returning nil values.
+type Optional[T any] struct {
+	// Value is the value that may or may not be present.
+	Value T
+	// Valid is true if the value is present, otherwise it is false.
+	Valid bool
+}
+
+func newValidOptional[T any](value T) Optional[T] {
+	return Optional[T]{Value: value, Valid: true}
+}
+
+func newInvalidOptional[T any]() Optional[T] {
+	return Optional[T]{Valid: false}
+}
 
 // Var models what the circumstances were when the error was encountered and is used to provide additional context
 // to the error. Its purpose is to be logged and thereby give context to the error in the logs.
@@ -118,6 +133,22 @@ func (xerr *Error) findQuotaFailure() (*errdetails.QuotaFailure, error) {
 		}
 	}
 	return nil, errNotFound
+}
+
+func (xerr *Error) findResourceInfos() ([]*errdetails.ResourceInfo, error) {
+	var infos []*errdetails.ResourceInfo
+	for _, detail := range xerr.status.Details() {
+		switch v := detail.(type) {
+		case *errdetails.ResourceInfo:
+			infos = append(infos, v)
+		default:
+			continue
+		}
+	}
+	if len(infos) == 0 {
+		return nil, errNotFound
+	}
+	return infos, nil
 }
 
 // AddBadRequestViolations adds a list of bad request violations to the error details. If the error details already
@@ -233,14 +264,9 @@ func (xerr *Error) AddResourceInfos(infos []ResourceInfo) *Error {
 // SetDebugInfoDetail sets debug info detail to the error details. If the error details already contain a debug info
 // detail, it is overwritten. If the detail is empty, the operation is a no-op.
 //
-// It is recommended to include a debug info detail for the following error types:
-//   - DATA_LOSS
-//   - UNKNOWN
-//   - INTERNAL
-//   - UNAVAILABLE
-//   - DEADLINE_EXCEEDED
-//
-// See: https://cloud.google.com/apis/design/errors#error_payloads
+// It is NOT recommended to include a debug info detail since it'll be returned to the caller. If you need to log
+// debug info, use the runtime state instead (the AddVar() and AddVars() methods). It's is however possible to include
+// a debug info detail and still not return it to the caller by calling the HideDetails() method.
 func (xerr *Error) SetDebugInfo(detail string, stackEntries []string) *Error {
 	if detail == "" {
 		return xerr
@@ -262,8 +288,20 @@ func (xerr *Error) SetDebugInfo(detail string, stackEntries []string) *Error {
 	return xerr
 }
 
+// QuotaViolation is a message type used to describe a single quota violation.  For example, a
+// daily quota or a custom quota that was exceeded.
 type QuotaViolation struct {
-	Subject     string
+	//Subject on which the quota check failed.
+	// For example, "clientip:<ip address of client>" or "project:<Google
+	// developer project id>".
+	Subject string
+	// Descriptions is a description of how the quota check failed. Clients can use this
+	// description to find more about the quota configuration in the service's
+	// public documentation, or find the relevant quota limit to adjust through
+	// developer console.
+	//
+	// For example: "Service disabled" or "Daily Limit for read operations
+	// exceeded".
 	Description string
 }
 
@@ -286,6 +324,142 @@ func (xerr *Error) AddQuotaViolations(violations []QuotaViolation) *Error {
 	}
 	existing.Violations = append(existing.Violations, violationspb...)
 	return xerr
+}
+
+// BadRequestViolations returns a list of bad request violations. If the error details do not contain bad request
+// violations, it returns nil.
+func (xerr *Error) BadRequestViolations() []BadRequestViolation {
+	pb, err := xerr.findBadRequest()
+	if errors.Is(err, errNotFound) {
+		return nil
+	}
+	violations := make([]BadRequestViolation, len(pb.FieldViolations))
+	for i, v := range pb.FieldViolations {
+		violations[i] = BadRequestViolation{Field: v.Field, Description: v.Description}
+	}
+	return violations
+}
+
+// PreconditionsViolations returns a list of precondition violations. If the error details do not contain precondition
+// violations, it returns nil.
+func (xerr *Error) PreconditionViolations() []PreconditionViolation {
+	pb, err := xerr.findPreconditionFailure()
+	if errors.Is(err, errNotFound) {
+		return nil
+	}
+	violations := make([]PreconditionViolation, len(pb.Violations))
+	for i, v := range pb.Violations {
+		violations[i] = PreconditionViolation{Description: v.Description, Subject: v.Subject, Typ: v.Type}
+	}
+	return violations
+}
+
+// ErrorInfo describes the cause of the error with structured details.
+//
+// Example of an error when contacting the "pubsub.googleapis.com" API when it
+// is not enabled:
+//
+//	{ "reason": "API_DISABLED",
+//	  "domain": "googleapis.com",
+//	  "metadata": {
+//	    "resource": "projects/123",
+//	    "service": "pubsub.googleapis.com"
+//	  }
+//	}
+//
+// This response indicates that the pubsub.googleapis.com API is not enabled.
+// Example of an error that is returned when attempting to create a Spanner
+// instance in a region that is out of stock:
+//
+//	{ "reason": "STOCKOUT",
+//	  "domain": "spanner.googleapis.com",
+//	  "metadata": {
+//	    "availableRegions": "us-central1,us-east2"
+//	  }
+//	}
+type ErrorInfo struct {
+	// Domain is the logical grouping to which the "reason" belongs. The error domain is typically the registered
+	// service name of the tool or product that generated the error. The domain must be a globally unique value.
+	Domain string
+	// Reason is a short snake_case description of why the error occurred. Error reasons are unique within a particular
+	// domain of errors. The application should define an enum of error reasons.
+	//
+	// The reason should have these properties:
+	//	- Be meaningful enough for a human reader to understand what the reason refers to.
+	//	- Be unique and consumable by machine actors for automation.
+	//	- Example: CPU_AVAILABILITY
+	//	- Distill your error message into its simplest form. For example, the reason string could be one of the
+	//	  following text examples in UPPER_SNAKE_CASE: UNAVAILABLE, NO_STOCK, CHECKED_OUT, AVAILABILITY_ERROR, if your
+	//	  error message is:
+	//	  The Book, "The Great Gatsby", is unavailable at the Library, "Garfield East". It is expected to be available
+	//	  again on 2199-05-13.
+	Reason string
+	// Metadata is additional structured details about this error, which should provide important context for clients
+	// to identify resolution steps. Keys should be in lower camel-case, and be limited to 64 characters in length.
+	// When identifying the current value of an exceeded limit, the units should be contained in the key, not the value.
+	//
+	// Example: {"vmType": "e2-medium", "attachment": "local-ssd=3,nvidia-t4=2", "zone": us-east1-a"}
+	Metadata map[string]string
+}
+
+// ErrorInfo returns the error info details. If the error details do not contain error info details, it returns an
+// invalid optional.
+func (xerr *Error) ErrorInfo() Optional[ErrorInfo] {
+	pb, err := xerr.findErrorInfo()
+	if errors.Is(err, errNotFound) {
+		return newInvalidOptional[ErrorInfo]()
+	}
+	return newValidOptional(ErrorInfo{Domain: pb.Domain, Reason: pb.Reason, Metadata: pb.Metadata})
+}
+
+// Describes additional debugging info.
+type DebugInfo struct {
+	// Additional debugging information provided by the server.
+	Detail string
+	// The stack trace entries indicating where the error occurred.
+	StackEntries []string
+}
+
+// DebugInfo returns the error info details. If the error details do not contain error info details, it returns an
+// invalid optional.
+func (xerr *Error) DebugInfo() Optional[DebugInfo] {
+	pb, err := xerr.findDebugInfo()
+	if errors.Is(err, errNotFound) {
+		return newInvalidOptional[DebugInfo]()
+	}
+	return newValidOptional(DebugInfo{Detail: pb.Detail, StackEntries: pb.StackEntries})
+}
+
+// ResourceInfos returns a list of resource info details. If the error details do not contain resource info details, it
+// returns nil.
+func (xerr *Error) ResourceInfos() []ResourceInfo {
+	pb, err := xerr.findResourceInfos()
+	if errors.Is(err, errNotFound) {
+		return nil
+	}
+	infos := make([]ResourceInfo, len(pb))
+	for i, v := range pb {
+		infos[i] = ResourceInfo{Description: v.Description,
+			ResourceName: v.ResourceName,
+			ResourceType: v.ResourceType,
+			Owner:        v.Owner,
+		}
+	}
+	return infos
+}
+
+// QuotaViolations returns a list of quota violations. If the error details do not contain quota violations, it returns
+// nil.
+func (xerr *Error) QuotaViolations() []QuotaViolation {
+	pb, err := xerr.findQuotaFailure()
+	if errors.Is(err, errNotFound) {
+		return nil
+	}
+	violations := make([]QuotaViolation, len(pb.Violations))
+	for i, v := range pb.Violations {
+		violations[i] = QuotaViolation{Subject: v.Subject, Description: v.Description}
+	}
+	return violations
 }
 
 // AddVar adds a variable to the runtime state.
@@ -474,19 +648,19 @@ func (xerr *Error) DomainType() string {
 // MarshalJSON marshals the error to JSON. This is only useful for testing purposes to be able to generate golden
 // files to be able to inspect the error in a human-readable format.
 func (xerr *Error) MarshalJSON() ([]byte, error) {
-	type out struct {
+	type marshallable struct {
 		LogLevel      LogLevel    `json:"logLevel"`
 		Status        *spb.Status `json:"status"`
 		DetailsHidden bool        `json:"detailsHidden"`
 		RuntimeState  []Var       `json:"runtimeState"`
 	}
-	marshalthis := out{
+	err := marshallable{
 		LogLevel:      xerr.logLevel,
 		Status:        xerr.status.Proto(),
 		DetailsHidden: xerr.detailsHidden,
 		RuntimeState:  xerr.runtimeState,
 	}
-	return json.Marshal(marshalthis)
+	return json.Marshal(err)
 }
 
 // WrappedError is a model that makes it easy to add more context to an error as it is passed up the call stack.
@@ -567,8 +741,11 @@ func DomainType(domain, reason string) string {
 	return domain + reason
 }
 
-// From returns an Error instance from an error. If the error is not an Error instance, then it is an unexpected error
-// and should be logged, so it can be discovered where in the code the error isn't correctly handled.
+// From returns an Error instance from an error. It's meant to be used in your application, at the place in the code
+// where the error is logged.
+//
+// If the error is not an Error instance, then it is an unexpected error and should be logged, so it can be discovered
+// that there's code where the error isn't correctly handled.
 func From(err error) *Error {
 	var xerr *Error
 	if !errors.As(err, &xerr) {

@@ -29,7 +29,9 @@ func UnaryXErrorInterceptor(ctx context.Context, req any, _ *grpc.UnaryServerInf
 	return resp, err
 }
 
-// ErrorFrom is a convenience function that creates a new xerror from a gRPC error.
+// ErrorFrom is a convenience function that creates a new xerror from a gRPC error. It is meant to be used by
+// gRPC clients to convert gRPC errors returned by a server to xerrors. If the error isn't a gRPC error, then
+// it returns an xerror with the status code Unknown.
 //
 // Ex.
 //

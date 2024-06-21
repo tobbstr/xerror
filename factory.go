@@ -26,8 +26,48 @@ func Init(domain string) {
 	maker = factory{domain: domain}
 }
 
+// BadRequestViolation is a message type used to describe a single bad request field.
 type BadRequestViolation struct {
-	Field, Description string
+	// Field is a path that leads to a field in the request body. The value will be a
+	// sequence of dot-separated identifiers that identify a protocol buffer
+	// field.
+	//
+	// Consider the following:
+	//
+	//	message CreateContactRequest {
+	//	  message EmailAddress {
+	//	    enum Type {
+	//	      TYPE_UNSPECIFIED = 0;
+	//	      HOME = 1;
+	//	      WORK = 2;
+	//	    }
+	//
+	//	    optional string email = 1;
+	//	    repeated EmailType type = 2;
+	//	  }
+	//
+	//	  string full_name = 1;
+	//	  repeated EmailAddress email_addresses = 2;
+	//	}
+	//
+	// In this example, in proto `field` could take one of the following values:
+	//
+	//   - `full_name` for a violation in the `full_name` value
+	//   - `email_addresses[1].email` for a violation in the `email` field of the
+	//     first `email_addresses` message
+	//   - `email_addresses[3].type[2]` for a violation in the second `type`
+	//     value in the third `email_addresses` message.
+	//
+	// In JSON, the same values are represented as:
+	//
+	//   - `fullName` for a violation in the `fullName` value
+	//   - `emailAddresses[1].email` for a violation in the `email` field of the
+	//     first `emailAddresses` message
+	//   - `emailAddresses[3].type[2]` for a violation in the second `type`
+	//     value in the third `emailAddresses` message.
+	Field string
+	// Description is a description of why the request element is bad.
+	Description string
 }
 
 type BadRequestOptions struct {
@@ -50,8 +90,21 @@ func (f factory) newInvalidArgumentErrors(opts BadRequestBatchOptions) *Error {
 	return f.newBatchBadRequest(msg, opts)
 }
 
+// PreconditionViolation is a message type used to describe a single precondition failure.
 type PreconditionViolation struct {
-	Description, Subject, Typ string
+	// Description is a description of how the precondition failed. Developers can use this
+	// description to understand how to fix the failure.
+	//
+	// For example: "Terms of service not accepted".
+	Description string
+	// Subject is the subject, relative to the type, that failed.
+	// For example, "google.com/cloud" relative to the "TOS" type would indicate
+	// which terms of service is being referenced.
+	Subject string
+	// Typ is the type of PreconditionFailure. It's recommended using a service-specific
+	// enum type to define the supported precondition violation subjects. For
+	// example, "TOS" for "Terms of Service violation".
+	Typ string
 }
 
 type PreconditionFailureOptions struct {
@@ -128,8 +181,25 @@ func (f factory) newPermissionDeniedError(opts ErrorInfoOptions) *Error { // nol
 	return e
 }
 
+// ResourceInfo describes the resource that is being accessed.
 type ResourceInfo struct {
-	Description, ResourceName, ResourceType, Owner string
+	// Description describes what error is encountered when accessing this resource.
+	// For example, updating a cloud project may require the `writer` permission
+	// on the developer console project.
+	Description string
+	// ResourceName is the name of the resource being accessed.  For example, a shared calendar
+	// name: "example.com_4fghdhgsrgh@group.calendar.google.com", if the current
+	// error is
+	// [google.rpc.Code.PERMISSION_DENIED][google.rpc.Code.PERMISSION_DENIED].
+	ResourceName string
+	// ResourceType is a name for the type of resource being accessed, e.g. "sql table",
+	// "cloud storage bucket", "file", "Google calendar"; or the type URL
+	// of the resource: e.g. "type.googleapis.com/google.pubsub.v1.Topic".
+	ResourceType string
+	// Owner is the owner of the resource (optional).
+	// For example, "user:<owner email>" or "project:<Google developer project
+	// id>".
+	Owner string
 }
 
 type NotFoundOptions struct {

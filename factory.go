@@ -76,6 +76,9 @@ type BadRequestOptions struct {
 }
 
 func (f factory) newInvalidArgument(opts BadRequestOptions) *Error {
+	// TODO(tobbstr): Add a function that accepts a the request object field and then it returns the field name.
+	// Ex. Instead of the user having to construct the field name such as "person.ownedDogs[1].name", they can
+	// pass the object and the function returns the field name.
 	const msg = "one or more request arguments were invalid"
 	return f.newBadRequest(msg, opts)
 }

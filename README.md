@@ -1,30 +1,35 @@
 # xerror
 
-An error handling enhancing library that provides an error type that is returnable by both HTTP and gRPC APIs. It's
-also useful in applications without any APIs thanks to it offering granular control of logging and builtin retry checks.
+xerror is a powerful error handling library designed to enhance error management in applications that utilize both HTTP and gRPC APIs. With xerror, you can easily define and wrap errors with additional context, add runtime states for logging purposes, and seamlessly handle errors in both gRPC and HTTP environments. This library also enables you to hide sensitive data in error responses and provides flexible log-level configuration.
 
-The error model it uses is the [Google Cloud APIs error model](https://google.aip.dev/193).
+By using xerror, you can streamline your error handling process and ensure consistent and compliant error responses. Whether you're building a microservice or a complex distributed system, xerror offers a comprehensive set of features to simplify error management and improve the reliability of your applications.
 
-## The problems it solves
+Don't let errors hinder the reliability and stability of your applications. Try xerror today and experience a new level of error handling sophistication.
 
-1. Defining an error where it happens that isn't just a text string.
-2. Provides the ability to wrap errors with a text string that gives more context to the error. It's possible to
-   return the error up the call stack, but with more context at each hop.
-3. Adding any number of runtime states (variable names and their values) to the error for logging further up the
-   call stack.
-4. Enables servers to both serve gRPC and HTTP clients without having to translate application errors into gRPC- and
-   HTTP-specific variants.
-5. Enables servers to hide sensitive data in their error responses.
-6. Provides an easy way to set the log-level which can be used by logging libraries so that the errors are logged
-   at the desired level.
-7. Offers error responses for both gRPC and HTTP that are compliant with [Google Cloud AIP-193](https://google.aip.dev/193) (API Improvement Proposals).
+The underlying error model used is the [Google Cloud APIs error model](https://google.aip.dev/193).
+
+## What's included
+
+- Simplifies error management in applications that utilize both HTTP and gRPC APIs.
+- Provides additional context and runtime states for error handling and logging purposes.
+- Enables hiding sensitive data in error responses.
+- Offers flexible log-level configuration.
+- Ensures consistent and compliant error responses.
+- Streamlines error handling process.
+- Improves the reliability of applications.
+- Provides a comprehensive set of features for error management.
+- Aligns with the Google Cloud APIs error model.
+- Enhances error handling sophistication.
+- Prevents errors from hindering reliability and stability of applications.
 
 ## Usage
 
-Add a call to `xerror.Init()` in your main.go file and run `go mod tidy` optionally followed by `go mod vendor` if
-your Go module vendors its dependencies. That call initialises the xerror package. It globally sets the "domain" value
-so we don't have to specify it every time we set an [ErrorInfo](https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto#L51) detail in our error. The domain value should be either the name of your service or its domain
-name.
+To get started, simply add a call to `xerror.Init()` in your main.go file and run `go mod tidy`. Then, you can leverage
+the various functionalities of xerror to handle errors effectively and efficiently.
+
+The `xerror.Init()` call is used to initialize the `xerror` package. It sets a global value called "domain" that is used when adding an [ErrorInfo](https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto#L51) detail to our error. The "domain" value should represent either the name of your service or its domain name. By setting the "domain" value globally, you don't have to specify it every time you add an ErrorInfo detail to your error. This simplifies the error handling process and ensures consistency throughout your application.
+
+An example:
 
 ```go
 // main.go
@@ -39,6 +44,102 @@ func main() {
 Then you're all set! ✅
 
 See the next sections for how to use it for different purposes.
+
+## The XError model
+
+An xerror has the following properties:
+
+1. A model that is returned from your application to the caller of your API
+  * [google.rpc.status](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto)
+2. Runtime state that consists of key pairs used for logging. You store the name and value of any variable you find
+worthy of logging in the runtime state.
+
+## Errors originating from your system
+
+This section demonstrates how to work with errors that happen in your system. Such as when validating arguments,
+or checking preconditions etc. In those cases, you're not returning the error from some library or system, but rather
+you're the one creating the root error. It's then up to you to classify the error correctly (invalid argument,
+aborted, etc.) according to the [google.rpc.code](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto)
+definitions.
+
+### Error constructors
+
+There are constructors that make it easy to initialize errors of different types. The types supported are those
+defined in [google.rpc.code](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto) such as:
+
+- INVALID_ARGUMENT
+- FAILED_PRECONDITION
+- OUT_OF_RANGE
+- UNAUTHENTICATED
+- PERMISSION_DENIED
+- NOT_FOUND
+- ABORTED
+- ALREADY_EXISTS
+- RESOURCE_EXHAUSTED
+- CANCELLED
+- DATA_LOSS
+- UNKNOWN
+- INTERNAL
+- NOT_IMPLEMENTED
+- UNAVAILABLE
+- DEADLINE_EXCEEDED
+
+For example, the constructor for the type `INVALID_ARGUMENT` is as follows:
+
+```go
+// validating arguments ...
+
+if request.Age < 65 {
+    return xerror.NewInvalidArgument(BadRequestOptions{
+        Violation: BadRequestViolation{Field: "age", Description: "This operation is reserved for people 65+"}
+    })
+}
+```
+
+### Visual overview of available error types
+
+Below an overview is presented that visualises how the the error types are organised. As can be seen, some error types
+are reserved for problems pertaining to a request, and some for problems with the server. Some however appear in both
+cases. A few of them are also inside other boxes, for example the `NOT_FOUND` error. The reason it's inside the
+`INVALID_ARGUMENT` box, is that it's a specialized version of an `INVALID_ARGUMENT`.
+
+```mermaid
+flowchart LR
+subgraph "Problems with the request"
+    CANCELED
+    subgraph INVALID_ARGUMENT
+        OUT_OF_RANGE
+        NOT_FOUND
+        DATA_LOSS
+    end
+    PERMISSION_DENIED
+    UNAUTHENTICATED
+end
+
+subgraph "Problems with the Server"
+    DATA_LOSS_2["DATA_LOSS"]
+    subgraph FAILED_PRECONDITION
+        ABORTED
+        ALREADY_EXISTS
+        RESOURCE_EXHAUSTED
+    end
+    UNKNOWN
+    INTERNAL
+    NOT_IMPLEMENTED
+    UNAVAILABLE
+    DEADLINE_EXCEEDED
+end
+```
+
+### Error guide
+
+With all of these error types how can I know which one to use? Just call the `xerror.ErrorGuide()` and read the
+comments to the options that appear in your intellisense 👊
+
+Although errors can be initialised using the error guide,
+it's only meant to guide you to the right error type. Once you know which one you need, you can use the available
+constructor functions such as `xerror.NewNotFound()`.
+
 
 ## Error logging
 
@@ -124,83 +225,6 @@ Setting the log level is quite easy as demonstrated in the example below.
 ```go
 return xerror.From(err).SetLogLevel(xerror.LogLevelWarn) // This sets a warning log level
 ```
-
-## Errors originating from your system
-
-This section demonstrates how to work with errors that happen in your system. Such as when validating arguments,
-or checking preconditions etc. In those cases, you're not returned the error from some library or system, but rather
-you're the one creating the root error. It's then up to you to classify the error correctly (invalid argument,
-aborted, etc.).
-
-### Error constructors
-
-There are constructors that make it easy to initialize errors of different types. The types supported are those
-defined in the Google Cloud APIs error model such as:
-
-- INVALID_ARGUMENT
-- FAILED_PRECONDITION
-- OUT_OF_RANGE
-- UNAUTHENTICATED
-- PERMISSION_DENIED
-- NOT_FOUND
-- ABORTED
-- ALREADY_EXISTS
-- RESOURCE_EXHAUSTED
-- CANCELLED
-- DATA_LOSS
-- UNKNOWN
-- INTERNAL
-- NOT_IMPLEMENTED
-- UNAVAILABLE
-- DEADLINE_EXCEEDED
-
-For example, the constructor for the type `unknown` is as follows:
-
-```go
-xerror.NewUnknown(SimpleOptions{Error: errors.New("something unknown happened")})
-```
-
-### Error type organisation
-
-Below an overview is presented that visualises how the the error types are organised. As can be seen, some error types
-are reserved for problems pertaining to a request, and some for problems with the server. Some however appear in both
-cases. A few of them are also inside other boxes, for example the `NOT_FOUND` error. The reason it's inside the
-`INVALID_ARGUMENT` box, is that it's a specialized version of an `INVALID_ARGUMENT`.
-
-```mermaid
-flowchart LR
-subgraph "Problems with the request"
-    CANCELED
-    subgraph INVALID_ARGUMENT
-        OUT_OF_RANGE
-        NOT_FOUND
-        DATA_LOSS
-    end
-    PERMISSION_DENIED
-    UNAUTHENTICATED
-end
-
-subgraph "Problems with the Server"
-    DATA_LOSS_2["DATA_LOSS"]
-    subgraph FAILED_PRECONDITION
-        ABORTED
-        ALREADY_EXISTS
-        RESOURCE_EXHAUSTED
-    end
-    UNKNOWN
-    INTERNAL
-    NOT_IMPLEMENTED
-    UNAVAILABLE
-    DEADLINE_EXCEEDED
-end
-```
-
-### Error guide
-
-With all of these error types how can I know which one to use? Just call the `xerror.ErrorGuide()` and read the
-comments to the options that appear in your intellisense. Although errors can be initialised using the error guide,
-it's only meant to guide you to the right error type. Once you know which one you need, you can use the available
-constructor functions such as `xerror.NewNotFound()`.
 
 ## Errors originating from external systems
 

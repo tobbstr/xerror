@@ -1,6 +1,6 @@
 # xerror
 
-xerror is a powerful error handling library designed to enhance error management in applications that utilize both HTTP and gRPC APIs. With xerror, you can easily define and wrap errors with additional context, add runtime states for logging purposes, and seamlessly handle errors in both gRPC and HTTP environments. This library also enables you to hide sensitive data in error responses and provides flexible log-level configuration.
+xerror is a powerful error handling library designed to enhance error management in applications that utilize both HTTP and gRPC APIs. With xerror, you can easily define and wrap errors with additional context, add runtime states for logging purposes, and seamlessly handle errors in both gRPC and HTTP environments. This library also enables you to hide sensitive data in error responses and provides flexible log level configuration.
 
 By using xerror, you can streamline your error handling process and ensure consistent and compliant error responses. Whether you're building a microservice or a complex distributed system, xerror offers a comprehensive set of features to simplify error management and improve the reliability of your applications.
 
@@ -13,7 +13,7 @@ The underlying error model used is the [Google Cloud APIs error model](https://g
 - Simplifies error management in applications that utilize both HTTP and gRPC APIs.
 - Provides additional context and runtime states for error handling and logging purposes.
 - Enables hiding sensitive data in error responses.
-- Offers flexible log-level configuration.
+- Offers flexible log level configuration.
 - Ensures consistent and compliant error responses.
 - Streamlines error handling process.
 - Improves the reliability of applications.
@@ -21,6 +21,7 @@ The underlying error model used is the [Google Cloud APIs error model](https://g
 - Aligns with the Google Cloud APIs error model.
 - Enhances error handling sophistication.
 - Prevents errors from hindering reliability and stability of applications.
+- Makes it easy to classify errors with a builtin error guide (usable from your code)
 
 ## Usage
 
@@ -45,27 +46,27 @@ Then you're all set! ✅
 
 See the next sections for how to use it for different purposes.
 
-## The XError model
+## XError properties
 
-An xerror has the following properties:
+When working with xerror, you can take advantage of the following properties:
 
-1. A model that is returned from your application to the caller of your API
-  * [google.rpc.status](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto)
-2. Runtime state that consists of key pairs used for logging. You store the name and value of any variable you find
-worthy of logging in the runtime state.
+1. **Error Model**: xerror utilizes the [google.rpc.status](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto) model to effectively return consistent errors from your application to API callers.
+2. **Debug Info and Error Info**: You have the option to remove debug info and error info details from the error response sent to API callers.
+3. **Runtime State**: Capture and log relevant information by storing key-value pairs in the runtime state. This allows for better error analysis and troubleshooting.
+4. **Log Level**: Set the log level for your application, ensuring that errors are logged at the appropriate severity level.
+5. **Retries**: Utilize the xerror API to easily determine if an error is retryable.
 
-## Errors originating from your system
+By leveraging these properties, you can enhance your error handling process and improve the overall reliability of your application.
+Remember to always consider the specific needs and requirements of your application when utilizing xerror.
 
-This section demonstrates how to work with errors that happen in your system. Such as when validating arguments,
-or checking preconditions etc. In those cases, you're not returning the error from some library or system, but rather
-you're the one creating the root error. It's then up to you to classify the error correctly (invalid argument,
-aborted, etc.) according to the [google.rpc.code](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto)
-definitions.
 
-### Error constructors
+## Errors originating within your system
 
-There are constructors that make it easy to initialize errors of different types. The types supported are those
-defined in [google.rpc.code](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto) such as:
+This section provides guidance on working with errors that occur within your system. Whether it's validating arguments or checking preconditions, you are responsible for creating the root error and classifying it correctly according to the [google.rpc.code](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto) definitions.
+
+### Error Constructors
+
+The xerror library offers convenient constructors to initialize errors of different types. These types align with the [google.rpc.code](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto) definitions, including:
 
 - INVALID_ARGUMENT
 - FAILED_PRECONDITION
@@ -84,7 +85,7 @@ defined in [google.rpc.code](https://github.com/googleapis/googleapis/blob/maste
 - UNAVAILABLE
 - DEADLINE_EXCEEDED
 
-For example, the constructor for the type `INVALID_ARGUMENT` is as follows:
+For example, to create an error of type `INVALID_ARGUMENT`, you can use the following constructor:
 
 ```go
 // validating arguments ...
@@ -96,16 +97,13 @@ if request.Age < 65 {
 }
 ```
 
-### Visual overview of available error types
+### Visual Overview of Error Types
 
-Below an overview is presented that visualises how the the error types are organised. As can be seen, some error types
-are reserved for problems pertaining to a request, and some for problems with the server. Some however appear in both
-cases. A few of them are also inside other boxes, for example the `NOT_FOUND` error. The reason it's inside the
-`INVALID_ARGUMENT` box, is that it's a specialized version of an `INVALID_ARGUMENT`.
+To help you understand the organization of error types, a visual overview is provided. Some error types are specific to problems with the request, while others are related to server issues. Additionally, certain error types are nested within others for more specialized scenarios. Here is a simplified representation:
 
 ```mermaid
 flowchart LR
-subgraph "Problems with the request"
+subgraph "Problems with the Request"
     CANCELED
     subgraph INVALID_ARGUMENT
         OUT_OF_RANGE
@@ -131,15 +129,14 @@ subgraph "Problems with the Server"
 end
 ```
 
-### Error guide
+### Error Guide
 
-With all of these error types how can I know which one to use? Just call the `xerror.ErrorGuide()` and read the
-comments to the options that appear in your intellisense 👊
+Don't let error classification complexity hinder your development. With xerror's error guide
+(`xerror.ErrorGuide()`), confidently identify and classify errors, making your code more consistent, robust and maintainable. The xerror library provides a built-in error guide function that simplifies error classification in your code. This error guide assists you in accurately categorizing errors, ensuring proper handling and management. By leveraging this feature, you can streamline your error handling process and improve the reliability of your application.
 
-Although errors can be initialised using the error guide,
-it's only meant to guide you to the right error type. Once you know which one you need, you can use the available
-constructor functions such as `xerror.NewNotFound()`.
+While the error guide is a valuable resource, you can also take advantage of the convenient constructor functions such as `xerror.NewNotFound()` once you have a clear understanding of your requirements.
 
+Feel free to explore the error guide and constructor functions to streamline your error handling process and ensure accurate error classification. Hopefully this information helps you effectively handle errors within your system.
 
 ## Error logging
 

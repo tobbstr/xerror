@@ -138,6 +138,66 @@ While the error guide is a valuable resource, you can also take advantage of the
 
 Feel free to explore the error guide and constructor functions to streamline your error handling process and ensure accurate error classification. Hopefully this information helps you effectively handle errors within your system.
 
+## Errors originating from external gRPC APIs
+
+When working with errors returned by gRPC APIs, the `xgrpc` package provides a convenient function called `ErrorFrom()`. This function allows you to keep the error status from the external system without mapping it into a specific `xerror` such as when
+constructing an xerror using the [constructors](#error-constructors) in the `xerror` package. Here's an example:
+
+```go
+// Example: Keeping the returned error status from the external call
+resp, err := grpcClient.DoThat()
+if err != nil {
+    return xgrpc.ErrorFrom(err) // This xerror retains the error status
+}
+```
+
+By using `ErrorFrom()`, you can handle errors from gRPC APIs effectively and maintain the original error status. Give it a try in your application!
+
+## Advanced Error Handling
+
+In some cases, simply wrapping a returned error in an `xerror` may not be sufficient. You may need to inspect the error and handle different error types differently. For example, let's say your service needs to order more pencils when it runs out of stock. If the order fails due to being out of stock, your service should make another call to restock the pencils.
+
+The Google Cloud APIs error model fully supports this use case. It leverages the `ErrorInfo` detail, which is included in the error status. The `ErrorInfo` detail serves the purpose of uniquely identifying errors, allowing for seamless propagation across multiple service hops. This enables an edge service to effectively inspect and take appropriate action based on the error. Rest assured, with the Google Cloud APIs error model, your error handling process will be robust, reliable, and efficient.
+
+```json
+{
+    "error": {
+        "code": 8,
+        "message": "The order couldn't be fulfilled. The requested item is out of stock",
+        "status": "RESOURCE_EXHAUSTED",
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                "reason": "OUT_OF_STOCK",
+                "domain": "greatpencils.com",
+                "metadata": {
+                    "service": "order.greatpencils.com"
+                }
+            }
+        ]
+    }
+}
+```
+
+The `reason` field (`error.details[0].reason` in this example) is designed to be examined for domain-specific errors. It is scoped to the domain and should be combined with the domain to distinguish between different services that share the same reason value.
+
+Thankfully, the `xerror` library offers a convenient method for checking domain-specific errors, making it easier to handle and manage errors in your application.
+
+```go
+resp, err := orderClientpb.OrderPencils()
+if err != nil {
+        xerr := xgrpc.ErrorFrom(err)
+        if xerr.IsDomainError(orderpb.Domain, orderpb.ReasonOutOfStock) { 
+                // handle the case when pencils are out of stock
+                restockPencils()
+        }
+}
+```
+
+In the example above, the order service exports its domain (e.g., "order.greatpencils.com") and domain-specific reasons (as enums) for the check. You can refer to [Google's enum definitions](https://github.com/googleapis/googleapis/blob/master/google/api/error_reason.proto) for inspiration.
+
+By leveraging this advanced error handling technique, you can effectively handle different error scenarios and ensure the smooth operation of your service.
+
 ## Error logging
 
 When it comes to logging, as a developer you're interested in two things. First, to log the error and all the relevant
@@ -223,77 +283,6 @@ Setting the log level is quite easy as demonstrated in the example below.
 return xerror.From(err).SetLogLevel(xerror.LogLevelWarn) // This sets a warning log level
 ```
 
-## Errors originating from external systems
-
-It happens that your application is returned an error from an external system such as when calling a gRPC
-endpoint. In general, you should inspect the error and create a desired xerror using the [constructors](#error-constructors).
-However, in the case of gRPC this library contains a package called `xgrpc` which has a convenience function for the
-times you do not want to map the error into a particular xerror, but rather want to keep the status from the external
-system. An example of this is given below:
-
-```go
-// Example: When you want to keep the returned error status from the external call
-resp, err := grpcClient.DoThat()
-if err != nil {
-    return xgrpc.ErrorFrom(err). // this xerror keeps the error status from err
-        AddVar("variable_name_1", valueOfVariable1) // adds context to the error that can be logged easily
-}
-```
-
-### Advanced error handling
-
-Sometimes it's not enough to just wrap a returned error in an xerror directly. Let's say you need to inspect the
-returned error and handle different error types differently. For example, let's say in the case you're out of stock
-of pencils, your service is responsible for ordering more of them. When your service makes a call to place an order
-for pencils, then it can fail and the returned error may be of a certain type to signify that the order couldn't be
-fulfilled due to being out of stock, in which case your service should make another call to order restocking of pencils.
-
-Does Google Cloud APIs error model support this usecase? Yes, it does. The way it handles it is by having an
-`ErrorInfo` detail included in the error status.
-
-```json
-{
-  "error": {
-    "code": 8,
-    "message": "The order couldn't be fulfilled. The requested item is out of stock",
-    "status": "RESOURCE_EXHAUSTED",
-    "details": [
-      {
-        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
-        "reason": "OUT_OF_STOCK",
-        "domain": "greatpencils.com",
-        "metadata": {
-          "service": "order.greatpencils.com"
-        }
-      }
-    ]
-  }
-}
-```
-
-Neither the "error.message" nor the "error.status" is meant for these domain-specific errors. Instead it's the
-reason field (the "error.details[0].reason" in this example) that is meant to be inspected. The reason only makes
-sense in combination with the domain. The reason is domain-scoped. Two different services may have the exact same
-reason value, but to distinguish between them the domain must also be taken into account when inspecting.
-
-Luckily the xerror library provides a convenience method on the xerror for checking for domain-specific errors.
-
-```go
-resp, err := orderClientpb.OrderPencils()
-if err != nil {
-    xerr := xgrpc.ErrorFrom(err)
-    // The order service has an exported domain constant and an enum for the reason. These are used to check the
-    // returned error type.
-    if xerr.IsDomainError(orderpb.Domain, orderpb.ReasonOutOfStock) { 
-        // handle the case when pencils are out of stock
-        restockPencils()
-    }
-}
-```
-
-NOTE! In the example above the order service (which is an external service in this example) exports its domain (ex.
-"order.greatpencils.com") and its domain-specific reasons (as enums) that we use for the check. See [Google's
-enum definitions](https://github.com/googleapis/googleapis/blob/master/google/api/error_reason.proto) for inspiration.
 
 ## Retries
 

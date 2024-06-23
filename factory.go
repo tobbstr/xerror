@@ -76,6 +76,9 @@ type BadRequestOptions struct {
 }
 
 func (f factory) newInvalidArgument(opts BadRequestOptions) *Error {
+	// TODO(tobbstr): Add a function that accepts a the request object field and then it returns the field name.
+	// Ex. Instead of the user having to construct the field name such as "person.ownedDogs[1].name", they can
+	// pass the object and the function returns the field name.
 	const msg = "one or more request arguments were invalid"
 	return f.newBadRequest(msg, opts)
 }
@@ -320,7 +323,13 @@ type SimpleOptions struct {
 }
 
 func (f factory) newServerDataLoss(opts SimpleOptions) *Error {
-	return f.newErrorWithHiddenDetails(codes.DataLoss, opts)
+	var msg string
+	if opts.Error == nil {
+		msg = "server data loss"
+	} else {
+		msg = opts.Error.Error()
+	}
+	return f.newErrorWithDetailsHidden(codes.DataLoss, msg, opts.LogLevel)
 }
 
 func (_ factory) newRequestDataLoss(opts ErrorInfoOptions) *Error {
@@ -328,11 +337,23 @@ func (_ factory) newRequestDataLoss(opts ErrorInfoOptions) *Error {
 }
 
 func (f factory) newUnknown(opts SimpleOptions) *Error {
-	return f.newErrorWithHiddenDetails(codes.Unknown, opts)
+	var msg string
+	if opts.Error == nil {
+		msg = "something unknown happened"
+	} else {
+		msg = opts.Error.Error()
+	}
+	return f.newErrorWithDetailsHidden(codes.Unknown, msg, opts.LogLevel)
 }
 
 func (f factory) newInternalError(opts SimpleOptions) *Error {
-	return f.newErrorWithHiddenDetails(codes.Internal, opts)
+	var msg string
+	if opts.Error == nil {
+		msg = "an internal server error happened"
+	} else {
+		msg = opts.Error.Error()
+	}
+	return f.newErrorWithDetailsHidden(codes.Internal, msg, opts.LogLevel)
 }
 
 func (f factory) newNotImplemented(logLevel LogLevel) *Error {
@@ -345,11 +366,23 @@ func (f factory) newNotImplemented(logLevel LogLevel) *Error {
 }
 
 func (f factory) newUnavailable(opts SimpleOptions) *Error {
-	return f.newErrorWithHiddenDetails(codes.Unavailable, opts)
+	var msg string
+	if opts.Error == nil {
+		msg = "the operation is currently unavailable"
+	} else {
+		msg = opts.Error.Error()
+	}
+	return f.newErrorWithDetailsHidden(codes.Unavailable, msg, opts.LogLevel)
 }
 
 func (f factory) newDeadlineExceeded(opts SimpleOptions) *Error {
-	return f.newErrorWithHiddenDetails(codes.DeadlineExceeded, opts)
+	var msg string
+	if opts.Error == nil {
+		msg = "the operation timed out (it might have succeeded though)"
+	} else {
+		msg = opts.Error.Error()
+	}
+	return f.newErrorWithDetailsHidden(codes.DeadlineExceeded, msg, opts.LogLevel)
 }
 
 /* ------------------------- Factory helper methods ------------------------- */
@@ -397,20 +430,17 @@ func (f factory) newErrorInfoError(code codes.Code, opts ErrorInfoOptions) *Erro
 	return e
 }
 
-func (_ factory) newErrorWithHiddenDetails(code codes.Code, opts SimpleOptions) *Error {
-	if opts.Error == nil {
-		return nil
-	}
-	var logLevel LogLevel
-	switch opts.LogLevel {
+func (_ factory) newErrorWithDetailsHidden(code codes.Code, msg string, logLevel LogLevel) *Error {
+	var lvl LogLevel
+	switch logLevel {
 	case LogLevelUnspecified:
-		logLevel = LogLevelError
+		lvl = LogLevelError
 	default:
-		logLevel = opts.LogLevel
+		lvl = logLevel
 	}
 	return &Error{
-		status:        *status.New(code, opts.Error.Error()),
-		logLevel:      logLevel,
+		status:        *status.New(code, msg),
+		logLevel:      lvl,
 		detailsHidden: true,
 	}
 }

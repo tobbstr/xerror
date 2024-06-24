@@ -1,9 +1,9 @@
 {
-    "logLevel": 1,
+    "logLevel": 0,
     "status": {
         "code": 1,
         "message": "request canceled by the client"
     },
-    "detailsHidden": true,
+    "detailsHidden": false,
     "runtimeState": null
 }

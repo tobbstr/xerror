@@ -25,14 +25,12 @@ func TestErrorFrom(t *testing.T) {
 		{
 			name: "err is of type status.Status",
 			args: args{err: status.New(codes.Canceled, "request canceled by the client").Err()},
-			want: xerror.NewCanceled(xerror.LogLevelUnspecified),
+			want: xerror.NewCanceled(),
 		},
 		{
 			name: "err is not of type status.Status",
 			args: args{err: errors.New("some error")},
-			want: xerror.NewUnknown(xerror.SimpleOptions{
-				Error: errors.New("some error"),
-			}),
+			want: xerror.NewUnknown(errors.New("some error")).SetLogLevel(xerror.LogLevelUnspecified),
 		},
 	}
 	for _, tt := range tests {
@@ -48,7 +46,7 @@ func TestErrorFrom(t *testing.T) {
 	}
 }
 
-func TestUnaryDetailsRemoverInterceptor(t *testing.T) {
+func TestUnaryXErrorInterceptor(t *testing.T) {
 	type args struct {
 		ctx     context.Context
 		req     any
@@ -58,10 +56,14 @@ func TestUnaryDetailsRemoverInterceptor(t *testing.T) {
 	type given struct {
 		handler grpc.UnaryHandler
 	}
+	type want struct {
+		value string
+		err   string
+	}
 	tests := []struct {
 		name  string
 		given given
-		want  string
+		want  want
 	}{
 		{
 			name: "handler returns no error",
@@ -70,29 +72,39 @@ func TestUnaryDetailsRemoverInterceptor(t *testing.T) {
 					return "whatever", nil
 				},
 			},
+			want: want{
+				value: "testdata/unary_xerror_interceptor/no_error.value.json",
+				err:   "testdata/unary_xerror_interceptor/no_error.err.json",
+			},
 		},
 		{ // The sensitive details should be present in the error
 			name: "xerror without hidden details",
 			given: given{
 				handler: func(ctx context.Context, req any) (any, error) {
-					return nil, xerror.NewCanceled(xerror.LogLevelDebug).
+					return nil, xerror.NewCanceled().
 						SetDebugInfo("this is a debug message", []string{"line 1", "line 2"}).
 						SetErrorInfo("this is an error message", "this is a reason", map[string]any{"key": "value"})
 				},
 			},
-			want: "testdata/unary_details_remover_interceptor/no_hidden_details.json",
+			want: want{
+				value: "testdata/unary_xerror_interceptor/no_hidden_details.value.json",
+				err:   "testdata/unary_xerror_interceptor/no_hidden_details.err.json",
+			},
 		},
 		{ // The sensitive details should be absent in the error
 			name: "xerror with hidden details",
 			given: given{
 				handler: func(ctx context.Context, req any) (any, error) {
-					return nil, xerror.NewCanceled(xerror.LogLevelDebug).
+					return nil, xerror.NewCanceled().
 						SetDebugInfo("this is a debug message", []string{"line 1", "line 2"}).
 						SetErrorInfo("this is an error message", "this is a reason", map[string]any{"key": "value"}).
 						HideDetails() // This call should hide the details
 				},
 			},
-			want: "testdata/unary_details_remover_interceptor/hidden_details.json",
+			want: want{
+				value: "testdata/unary_xerror_interceptor/hidden_details.value.json",
+				err:   "testdata/unary_xerror_interceptor/hidden_details.err.json",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -104,18 +116,12 @@ func TestUnaryDetailsRemoverInterceptor(t *testing.T) {
 			got, err := UnaryXErrorInterceptor(args.ctx, args.req, args.info, args.handler)
 
 			/* ---------------------------------- Then ---------------------------------- */
-			require := require.New(t)
-			if err == nil {
-				require.NoError(err)
-				require.NotNil(got)
-				return
-			}
-
 			// Assert the returned value
-			require.Nil(got)
+			golden.JSON(t, tt.want.value, got)
 
 			// Assert the returned error
-			golden.JSON(t, tt.want, err)
+			xerr := ErrorFrom(err)
+			golden.JSON(t, tt.want.err, xerr)
 		})
 	}
 }

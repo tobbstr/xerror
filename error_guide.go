@@ -35,7 +35,7 @@ type requestIssue struct{}
 // the server, and the server should then respond with a Canceled error.
 //
 // This case is a "CANCELLED" error.
-func (requestIssue) Canceled() func(logLevel LogLevel) *Error {
+func (requestIssue) Canceled() func() *Error {
 	return maker.newCanceledError
 }
 
@@ -53,7 +53,7 @@ type invalidArgIssue struct{}
 //  1. When a user provides an invalid value for an email address or phone number.
 //
 // This case is an "INVALID_ARGUMENT" error.
-func (invalidArgIssue) Other() func(opts BadRequestOptions) *Error {
+func (invalidArgIssue) Other() func(field, description string) *Error {
 	return maker.newInvalidArgument
 }
 
@@ -65,7 +65,7 @@ func (invalidArgIssue) Other() func(opts BadRequestOptions) *Error {
 //     pages.
 //
 // This case is an "OUT_OF_RANGE" error.
-func (invalidArgIssue) OutOfRange() func(opts BadRequestOptions) *Error {
+func (invalidArgIssue) OutOfRange() func(field, description string) *Error {
 	return maker.newOutOfRangeError
 }
 
@@ -76,7 +76,7 @@ func (invalidArgIssue) OutOfRange() func(opts BadRequestOptions) *Error {
 //     when a user makes a request to get a specific resource by id, but the resource with that id does not exist.
 //
 // This case is a "NOT_FOUND" error.
-func (invalidArgIssue) NotFound() func(opts NotFoundOptions) *Error {
+func (invalidArgIssue) NotFound() func(info ResourceInfo) *Error {
 	return maker.newNotFound
 }
 
@@ -125,7 +125,7 @@ func (requestIssue) Unauthenticated() func(opts ErrorInfoOptions) *Error {
 //     resulting in partial or complete data loss.
 //
 // This case is a "DATA_LOSS" error.
-func (serverIssue) ServerDataLoss() func(opts SimpleOptions) *Error {
+func (serverIssue) ServerDataLoss() func(err error) *Error {
 	return maker.newServerDataLoss
 }
 
@@ -144,7 +144,7 @@ type precondFailureIssue struct{}
 //  2. When an operation fails because the user has not agreed to the terms and conditions.
 //
 // This case is a "FAILED_PRECONDITION" error.
-func (precondFailureIssue) Other() func(opts PreconditionFailureOptions) *Error {
+func (precondFailureIssue) Other() func(subject, typ, description string) *Error {
 	return maker.newPreconditionFailure
 }
 
@@ -176,7 +176,7 @@ func (precondFailureIssue) Aborted() func(opts ErrorInfoOptions) *Error {
 //  4. When an attempt is made to insert a record into a database with a primary key that already exists.
 //
 // This case is an "ALREADY_EXISTS" error.
-func (precondFailureIssue) AlreadyExists() func(opts AlreadyExistsOptions) *Error {
+func (precondFailureIssue) AlreadyExists() func(info ResourceInfo) *Error {
 	return maker.newAlreadyExists
 }
 
@@ -207,7 +207,7 @@ func (resourceExhaustedIssue) Other() func(opts ErrorInfoOptions) *Error {
 //  3. When a client exceeds the number of allowed concurrent requests.
 //
 // This case is a "RESOURCE_EXHAUSTED" error.
-func (resourceExhaustedIssue) QuotaFailure() func(opts QuotaFailureOptions) *Error {
+func (resourceExhaustedIssue) QuotaFailure() func(subject, description string) *Error {
 	return maker.newQuotaFailure
 }
 
@@ -221,7 +221,7 @@ func (resourceExhaustedIssue) QuotaFailure() func(opts QuotaFailureOptions) *Err
 //     other specific error codes.
 //
 // This case is an "UNKNOWN" error.
-func (serverIssue) Unknown() func(opts SimpleOptions) *Error {
+func (serverIssue) Unknown() func(err error) *Error {
 	return maker.newUnknown
 }
 
@@ -237,7 +237,7 @@ func (serverIssue) Unknown() func(opts SimpleOptions) *Error {
 //     returned error status must not be used, then a mapping to a generic INTERNAL error is required.
 //
 // This case is an "INTERNAL" error.
-func (serverIssue) Internal() func(opts SimpleOptions) *Error {
+func (serverIssue) Internal() func(err error) *Error {
 	return maker.newInternalError
 }
 
@@ -253,7 +253,7 @@ func (serverIssue) Internal() func(opts SimpleOptions) *Error {
 //     implemented.
 //
 // This case is a "NOT_IMPLEMENTED" error.
-func (serverIssue) NotImplemented() func(logLevel LogLevel) *Error {
+func (serverIssue) NotImplemented() func() *Error {
 	return maker.newNotImplemented
 }
 
@@ -269,7 +269,7 @@ func (serverIssue) NotImplemented() func(logLevel LogLevel) *Error {
 //  5. When the server is temporarily unavailable because it is restarting.
 //
 // This case is an "UNAVAILABLE" error.
-func (serverIssue) Unavailable() func(opts SimpleOptions) *Error {
+func (serverIssue) Unavailable() func(err error) *Error {
 	return maker.newUnavailable
 }
 
@@ -285,6 +285,6 @@ func (serverIssue) Unavailable() func(opts SimpleOptions) *Error {
 //  5. When a batch processing job takes longer than the specified time limit.
 //
 // This case is a "DEADLINE_EXCEEDED" error.
-func (serverIssue) DeadlineExceeded() func(opts SimpleOptions) *Error {
+func (serverIssue) DeadlineExceeded() func() *Error {
 	return maker.newDeadlineExceeded
 }

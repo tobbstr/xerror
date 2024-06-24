@@ -12,7 +12,7 @@
                 ]
             }
         ],
-        "message": "one or more request arguments were invalid",
+        "message": "one request arguments was invalid",
         "status": "INVALID_ARGUMENT"
     }
 }

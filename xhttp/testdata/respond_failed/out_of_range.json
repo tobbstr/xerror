@@ -1,6 +1,6 @@
 {
     "error": {
-        "code": 3,
+        "code": 11,
         "details": [
             {
                 "@type": "type.googleapis.com/google.rpc.BadRequest",
@@ -12,7 +12,7 @@
                 ]
             }
         ],
-        "message": "one or more request arguments were out of range",
-        "status": "INVALID_ARGUMENT"
+        "message": "one request argument was out of range",
+        "status": "OUT_OF_RANGE"
     }
 }

@@ -35,10 +35,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "invalid argument",
 			given: given{
-				err: xerror.NewInvalidArgument(xerror.BadRequestOptions{
-					Violation: xerror.BadRequestViolation{Field: "age", Description: "must be greater than 0"},
-					LogLevel:  xerror.LogLevelError,
-				}),
+				err: xerror.NewInvalidArgument("age", "must be greater than 0"),
 			},
 			want: want{
 				code: http.StatusBadRequest,
@@ -48,11 +45,9 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "invalid arguments",
 			given: given{
-				err: xerror.NewInvalidArgumentBatch(xerror.BadRequestBatchOptions{
-					Violations: []xerror.BadRequestViolation{
-						{Field: "age", Description: "must be greater than 0"},
-						{Field: "name", Description: "cannot be empty"},
-					},
+				err: xerror.NewInvalidArgumentBatch([]xerror.BadRequestViolation{
+					{Field: "age", Description: "must be greater than 0"},
+					{Field: "name", Description: "cannot be empty"},
 				}),
 			},
 			want: want{
@@ -63,13 +58,11 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "precondition failure",
 			given: given{
-				err: xerror.NewPreconditionFailure(xerror.PreconditionFailureOptions{
-					Violation: xerror.PreconditionViolation{
-						Description: "user could not be updated because the user was changed since it was read",
-						Subject:     "example.com/v1/users/123",
-						Typ:         "ErrVersionMismatch",
-					},
-				}),
+				err: xerror.NewPreconditionFailure(
+					"example.com/v1/users/123",
+					"ErrVersionMismatch",
+					"user could not be updated because the user was changed since it was read",
+				),
 			},
 			want: want{
 				code: http.StatusBadRequest,
@@ -79,9 +72,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "out of range",
 			given: given{
-				err: xerror.NewOutOfRange(xerror.BadRequestOptions{
-					Violation: xerror.BadRequestViolation{Field: "age", Description: "must be between 18 and 65"},
-				}),
+				err: xerror.NewOutOfRange("age", "must be between 18 and 65"),
 			},
 			want: want{
 				code: http.StatusBadRequest,
@@ -125,12 +116,10 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "not found (single)",
 			given: given{
-				err: xerror.NewNotFound(xerror.NotFoundOptions{
-					ResourceInfo: xerror.ResourceInfo{
-						Description:  "resource not found",
-						ResourceName: "example.v1.User",
-						ResourceType: "User",
-					},
+				err: xerror.NewNotFound(xerror.ResourceInfo{
+					Description:  "resource not found",
+					ResourceName: "example.v1.User",
+					ResourceType: "User",
 				}),
 			},
 			want: want{
@@ -141,18 +130,16 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "not found (multi)",
 			given: given{
-				err: xerror.NewNotFoundBatch(xerror.NotFoundBatchOptions{
-					ResourceInfos: []xerror.ResourceInfo{
-						{
-							Description:  "resource not found",
-							ResourceName: "projects/12345/buckets/MyErrors",
-							ResourceType: "storage.v1.Bucket",
-						},
-						{
-							Description:  "resource not found",
-							ResourceName: "projects/12345/iam/MyUser",
-							ResourceType: "iam.v1.User",
-						},
+				err: xerror.NewNotFoundBatch([]xerror.ResourceInfo{
+					{
+						Description:  "resource not found",
+						ResourceName: "projects/12345/buckets/MyErrors",
+						ResourceType: "storage.v1.Bucket",
+					},
+					{
+						Description:  "resource not found",
+						ResourceName: "projects/12345/iam/MyUser",
+						ResourceType: "iam.v1.User",
 					},
 				}),
 			},
@@ -181,12 +168,10 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "already exists (single)",
 			given: given{
-				err: xerror.NewAlreadyExists(xerror.AlreadyExistsOptions{
-					ResourceInfo: xerror.ResourceInfo{
-						Description:  "resource already exists",
-						ResourceName: "projects/12345/buckets/MyErrors",
-						ResourceType: "storage.v1.Bucket",
-					},
+				err: xerror.NewAlreadyExists(xerror.ResourceInfo{
+					Description:  "resource already exists",
+					ResourceName: "projects/12345/buckets/MyErrors",
+					ResourceType: "storage.v1.Bucket",
 				}),
 			},
 			want: want{
@@ -197,18 +182,16 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "already exists (multi)",
 			given: given{
-				err: xerror.NewAlreadyExistsBatch(xerror.AlreadyExistsBatchOptions{
-					ResourceInfos: []xerror.ResourceInfo{
-						{
-							Description:  "resource already exists",
-							ResourceName: "projects/12345/buckets/MyErrors",
-							ResourceType: "storage.v1.Bucket",
-						},
-						{
-							Description:  "resource already exists",
-							ResourceName: "projects/12345/iam/MyUser",
-							ResourceType: "iam.v1.User",
-						},
+				err: xerror.NewAlreadyExistsBatch([]xerror.ResourceInfo{
+					{
+						Description:  "resource already exists",
+						ResourceName: "projects/12345/buckets/MyErrors",
+						ResourceType: "storage.v1.Bucket",
+					},
+					{
+						Description:  "resource already exists",
+						ResourceName: "projects/12345/iam/MyUser",
+						ResourceType: "iam.v1.User",
 					},
 				}),
 			},
@@ -220,13 +203,10 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "resource exhausted",
 			given: given{
-				err: xerror.NewQuotaFailure(xerror.QuotaFailureOptions{
-					Error: errors.New("the request for this project exceeds the available quota."),
-					QuotaViolation: xerror.QuotaViolation{
-						Subject:     "projects/123",
-						Description: "the maximum number of instances for this project has been reached",
-					},
-				}),
+				err: xerror.NewQuotaFailure(
+					"projects/123",
+					"the maximum number of instances for this project has been reached",
+				),
 			},
 			want: want{
 				code: http.StatusTooManyRequests,
@@ -236,7 +216,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "canceled",
 			given: given{
-				err: xerror.NewCanceled(xerror.LogLevelDebug),
+				err: xerror.NewCanceled(),
 			},
 			want: want{
 				code: 499,
@@ -246,9 +226,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "data loss",
 			given: given{
-				err: xerror.NewServerDataLoss(xerror.SimpleOptions{
-					Error: errors.New("unrecoverable data loss or corruption"),
-				}),
+				err: xerror.NewServerDataLoss(errors.New("unrecoverable data loss or corruption")),
 			},
 			want: want{
 				code: http.StatusInternalServerError,
@@ -258,9 +236,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "unknown",
 			given: given{
-				err: xerror.NewUnknown(xerror.SimpleOptions{
-					Error: errors.New("something unknown happened"),
-				}),
+				err: xerror.NewUnknown(errors.New("something unknown happened")),
 			},
 			want: want{
 				code: http.StatusInternalServerError,
@@ -270,9 +246,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "internal",
 			given: given{
-				err: xerror.NewInternal(xerror.SimpleOptions{
-					Error: errors.New("internal server error"),
-				}),
+				err: xerror.NewInternal(errors.New("internal server error")),
 			},
 			want: want{
 				code: http.StatusInternalServerError,
@@ -282,7 +256,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "not implemented",
 			given: given{
-				err: xerror.NewNotImplemented(xerror.LogLevelInfo),
+				err: xerror.NewNotImplemented(),
 			},
 			want: want{
 				code: http.StatusNotImplemented,
@@ -292,9 +266,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "unavailable",
 			given: given{
-				err: xerror.NewUnavailable(xerror.SimpleOptions{
-					Error: errors.New("service is currently unavailable"),
-				}),
+				err: xerror.NewUnavailable(errors.New("service is currently unavailable")),
 			},
 			want: want{
 				code: http.StatusServiceUnavailable,
@@ -304,9 +276,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "deadline exceeded",
 			given: given{
-				err: xerror.NewDeadlineExceeded(xerror.SimpleOptions{
-					Error: errors.New("request timed out"),
-				}),
+				err: xerror.NewDeadlineExceeded(),
 			},
 			want: want{
 				code: http.StatusGatewayTimeout,
@@ -316,9 +286,7 @@ func TestRespondFailed(t *testing.T) {
 		{
 			name: "hide details",
 			given: given{
-				err: xerror.NewDeadlineExceeded(xerror.SimpleOptions{
-					Error: errors.New("request timed out"),
-				}).
+				err: xerror.NewDeadlineExceeded().
 					SetDebugInfo("this is a debug message", []string{"line 1", "line 2"}).
 					SetErrorInfo("this is an error message", "this is a reason", map[string]any{"key": "value"}).
 					HideDetails(),

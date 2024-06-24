@@ -12,7 +12,7 @@
                 ]
             }
         ],
-        "message": "the request for this project exceeds the available quota.",
+        "message": "the request cannot be completed because the quota has been exhausted",
         "status": "RESOURCE_EXHAUSTED"
     }
 }

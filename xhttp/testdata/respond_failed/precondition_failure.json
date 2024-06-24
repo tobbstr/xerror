@@ -13,7 +13,7 @@
                 ]
             }
         ],
-        "message": "one or more request preconditions failed",
+        "message": "one request precondition failed",
         "status": "FAILED_PRECONDITION"
     }
 }

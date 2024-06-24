@@ -91,9 +91,7 @@ For example, to create an error of type `INVALID_ARGUMENT`, you can use the foll
 // validating arguments ...
 
 if request.Age < 65 {
-    return xerror.NewInvalidArgument(BadRequestOptions{
-        Violation: BadRequestViolation{Field: "age", Description: "This operation is reserved for people 65+"}
-    })
+    return xerror.NewInvalidArgument("age", "This operation is reserved for people 65+")
 }
 ```
 
@@ -229,7 +227,7 @@ For untrusted callers of type (1), the error may be propagated to the caller as-
 ```go
 resp, err := orderClientpb.OrderPencils()
 if err != nil {
-    return xerror.NewInternal(xerror.SimpleOptions{}).
+    return xerror.NewInternal(err).
         HideDetails() // Hides sensitive details before returning the error to the caller
 }
 ```
@@ -312,7 +310,7 @@ func PerformCalculation(input int) error {
     result, err := calculate(input)
     if err != nil {
         // Create an xerror value with the runtime state
-        return xerror.NewInternal(xerror.SimpleOptions{Error: err}).
+        return xerror.NewInternal(err).
             AddVar("input": input).  // Adds the input to the runtime state
             AddVar("result", result) // Adds the intermediate result to the runtime state
     }

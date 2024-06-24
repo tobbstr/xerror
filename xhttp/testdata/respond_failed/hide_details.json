@@ -1,7 +1,7 @@
 {
     "error": {
         "code": 4,
-        "message": "request timed out",
+        "message": "the operation timed out (it might have succeeded though)",
         "status": "DEADLINE_EXCEEDED"
     }
 }

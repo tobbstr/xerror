@@ -9,6 +9,15 @@ import (
 
 var ErrFailedToAddErrorDetails = errors.New("failed to add error details")
 
+const (
+	msgInvalidArg           = "one request arguments was invalid"
+	msgInvalidArgs          = "one or more request arguments were invalid"
+	msgPreconditionFailure  = "one request precondition failed"
+	msgPreconditionFailures = "one or more request preconditions failed"
+	msgOutOfRange           = "one request argument was out of range"
+	msgOutOfRangeErrors     = "one or more request arguments were out of range"
+)
+
 var maker = factory{}
 
 type factory struct {
@@ -70,27 +79,15 @@ type BadRequestViolation struct {
 	Description string
 }
 
-type BadRequestOptions struct {
-	Violation BadRequestViolation
-	LogLevel  LogLevel
-}
-
-func (f factory) newInvalidArgument(opts BadRequestOptions) *Error {
+func (f factory) newInvalidArgument(field, description string) *Error {
 	// TODO(tobbstr): Add a function that accepts a the request object field and then it returns the field name.
 	// Ex. Instead of the user having to construct the field name such as "person.ownedDogs[1].name", they can
 	// pass the object and the function returns the field name.
-	const msg = "one or more request arguments were invalid"
-	return f.newBadRequest(msg, opts)
+	return f.newBadRequest(msgInvalidArg, BadRequestViolation{Field: field, Description: description})
 }
 
-type BadRequestBatchOptions struct {
-	Violations []BadRequestViolation
-	LogLevel   LogLevel
-}
-
-func (f factory) newInvalidArgumentErrors(opts BadRequestBatchOptions) *Error {
-	const msg = "one or more request arguments were invalid"
-	return f.newBatchBadRequest(msg, opts)
+func (f factory) newInvalidArgumentErrors(violations []BadRequestViolation) *Error {
+	return f.newBatchBadRequest(msgInvalidArgs, violations)
 }
 
 // PreconditionViolation is a message type used to describe a single precondition failure.
@@ -110,50 +107,46 @@ type PreconditionViolation struct {
 	Typ string
 }
 
-type PreconditionFailureOptions struct {
-	Violation PreconditionViolation
-	LogLevel  LogLevel
-}
-
-func (f factory) newPreconditionFailure(opts PreconditionFailureOptions) *Error {
-	const msg = "one or more request preconditions failed"
+func (f factory) newPreconditionFailure(subject, typ, description string) *Error {
 	e := &Error{
-		status: *status.New(codes.FailedPrecondition, msg),
+		status:   *status.New(codes.FailedPrecondition, msgPreconditionFailure),
+		logLevel: LogLevelWarn,
 	}
-	_ = e.AddPreconditionViolations([]PreconditionViolation{opts.Violation})
+	_ = e.AddPreconditionViolations([]PreconditionViolation{{Description: description, Subject: subject, Typ: typ}})
 	return e
 }
 
-type PreconditionFailureBatchOptions struct {
-	Violations []PreconditionViolation
-	LogLevel   LogLevel
-}
-
-func (f factory) newPreconditionFailures(opts PreconditionFailureBatchOptions) *Error {
-	const msg = "one or more request preconditions failed"
+func (f factory) newPreconditionFailures(violations []PreconditionViolation) *Error {
 	e := &Error{
-		status: *status.New(codes.FailedPrecondition, msg),
+		status:   *status.New(codes.FailedPrecondition, msgPreconditionFailures),
+		logLevel: LogLevelWarn,
 	}
 
-	_ = e.AddPreconditionViolations(opts.Violations)
+	_ = e.AddPreconditionViolations(violations)
 	return e
 }
 
-func (f factory) newOutOfRangeError(opts BadRequestOptions) *Error {
-	const msg = "one or more request arguments were out of range"
-	return f.newBadRequest(msg, opts)
+func (f factory) newOutOfRangeError(field, description string) *Error {
+	e := &Error{
+		status:   *status.New(codes.OutOfRange, msgOutOfRange),
+		logLevel: LogLevelInfo,
+	}
+	_ = e.AddBadRequestViolations([]BadRequestViolation{{Field: field, Description: description}})
+	return e
 }
 
-func (f factory) newOutOfRangeErrors(opts BadRequestBatchOptions) *Error {
-	const msg = "one or more request arguments were out of range"
-	return f.newBatchBadRequest(msg, opts)
+func (f factory) newOutOfRangeErrors(violations []BadRequestViolation) *Error {
+	e := &Error{
+		status:   *status.New(codes.OutOfRange, msgOutOfRangeErrors),
+		logLevel: LogLevelInfo,
+	}
+	_ = e.AddBadRequestViolations(violations)
+	return e
 }
 
 type ErrorInfoOptions struct {
 	// Error is the error that occurred.
 	Error error
-	// Loglevel is the level of logging that should be used for this error.
-	LogLevel LogLevel
 	// Reason is a short snake_case description of why the error occurred. Error reasons are unique within a particular
 	// domain of errors. The application should define an enum of error reasons.
 	//
@@ -176,11 +169,11 @@ type ErrorInfoOptions struct {
 }
 
 func (f factory) newUnauthenticatedError(opts ErrorInfoOptions) *Error {
-	return f.newErrorInfoError(codes.Unauthenticated, opts)
+	return f.newErrorInfoError(codes.Unauthenticated, LogLevelInfo, opts)
 }
 
 func (f factory) newPermissionDeniedError(opts ErrorInfoOptions) *Error { // nolint:unparam
-	e := f.newErrorInfoError(codes.PermissionDenied, opts)
+	e := f.newErrorInfoError(codes.PermissionDenied, LogLevelInfo, opts)
 	return e
 }
 
@@ -205,226 +198,174 @@ type ResourceInfo struct {
 	Owner string
 }
 
-type NotFoundOptions struct {
-	ResourceInfo ResourceInfo
-	LogLevel     LogLevel
-}
-
-func (_ factory) newNotFound(opts NotFoundOptions) *Error {
+func (_ factory) newNotFound(info ResourceInfo) *Error {
 	const msg = "requested resource not found"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
-		logLevel: opts.LogLevel,
+		logLevel: LogLevelInfo,
 	}
 
-	_ = e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
+	_ = e.AddResourceInfos([]ResourceInfo{info})
 	return e
 }
 
-type NotFoundBatchOptions struct {
-	ResourceInfos []ResourceInfo
-	LogLevel      LogLevel
-}
-
-func (_ factory) newBatchNotFound(opts NotFoundBatchOptions) *Error {
+func (_ factory) newBatchNotFound(infos []ResourceInfo) *Error {
 	const msg = "requested resources not found"
 	e := &Error{
 		status:   *status.New(codes.NotFound, msg),
-		logLevel: opts.LogLevel,
+		logLevel: LogLevelInfo,
 	}
 
-	_ = e.AddResourceInfos(opts.ResourceInfos)
+	_ = e.AddResourceInfos(infos)
 	return e
 }
 
 func (f factory) newAborted(opts ErrorInfoOptions) *Error {
-	return f.newErrorInfoError(codes.Aborted, opts)
+	return f.newErrorInfoError(codes.Aborted, LogLevelWarn, opts)
 }
 
-type AlreadyExistsOptions struct {
-	ResourceInfo ResourceInfo
-	LogLevel     LogLevel
-}
-
-func (f factory) newAlreadyExists(opts AlreadyExistsOptions) *Error {
+func (f factory) newAlreadyExists(info ResourceInfo) *Error {
 	const msg = "resource already exists"
 	e := &Error{
 		status:   *status.New(codes.AlreadyExists, msg),
-		logLevel: opts.LogLevel,
+		logLevel: LogLevelInfo,
 	}
 
-	_ = e.AddResourceInfos([]ResourceInfo{opts.ResourceInfo})
+	_ = e.AddResourceInfos([]ResourceInfo{info})
 	return e
 }
 
-type AlreadyExistsBatchOptions struct {
-	ResourceInfos []ResourceInfo
-	LogLevel      LogLevel
-}
-
-func (_ factory) newAlreadyExistsBatch(opts AlreadyExistsBatchOptions) *Error {
+func (_ factory) newAlreadyExistsBatch(infos []ResourceInfo) *Error {
 	const msg = "resources already exist"
 	e := &Error{
 		status:   *status.New(codes.AlreadyExists, msg),
-		logLevel: opts.LogLevel,
+		logLevel: LogLevelInfo,
 	}
-	_ = e.AddResourceInfos(opts.ResourceInfos)
+	_ = e.AddResourceInfos(infos)
 	return e
 }
 
-type QuotaFailureOptions struct {
-	Error          error
-	QuotaViolation QuotaViolation
-	LogLevel       LogLevel
-}
-
-func (_ factory) newQuotaFailure(opts QuotaFailureOptions) *Error {
+func (_ factory) newQuotaFailure(subject, description string) *Error {
 	e := &Error{
-		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
-		logLevel: opts.LogLevel,
+		status:   *status.New(codes.ResourceExhausted, "the request cannot be completed because the quota has been exhausted"),
+		logLevel: LogLevelInfo,
 	}
 
-	_ = e.AddQuotaViolations([]QuotaViolation{opts.QuotaViolation})
+	_ = e.AddQuotaViolations([]QuotaViolation{{Subject: subject, Description: description}})
 	return e
 }
 
-type QuotaFailureBatchOptions struct {
-	Error           error
-	QuotaViolations []QuotaViolation
-	LogLevel        LogLevel
-}
-
-func (_ factory) newQuotaFailureBatch(opts QuotaFailureBatchOptions) *Error {
+func (_ factory) newQuotaFailureBatch(violations []QuotaViolation) *Error {
 	e := &Error{
-		status:   *status.New(codes.ResourceExhausted, opts.Error.Error()),
-		logLevel: opts.LogLevel,
+		status:   *status.New(codes.ResourceExhausted, "the request cannot be completed because the quota has been exhausted"),
+		logLevel: LogLevelInfo,
 	}
 
-	_ = e.AddQuotaViolations(opts.QuotaViolations)
+	_ = e.AddQuotaViolations(violations)
 	return e
 }
 
 func (_ factory) newResourceExhausted(opts ErrorInfoOptions) *Error {
-	return maker.newErrorInfoError(codes.ResourceExhausted, opts)
+	return maker.newErrorInfoError(codes.ResourceExhausted, LogLevelWarn, opts)
 }
 
-func (_ factory) newCanceledError(logLevel LogLevel) *Error {
+func (_ factory) newCanceledError() *Error {
 	const msg = "request canceled by the client"
 	e := &Error{
-		status:   *status.New(codes.Canceled, msg),
-		logLevel: logLevel,
+		status: *status.New(codes.Canceled, msg),
 	}
 	return e
 }
 
-type SimpleOptions struct {
-	Error    error
-	LogLevel LogLevel
-}
-
-func (f factory) newServerDataLoss(opts SimpleOptions) *Error {
+func (f factory) newServerDataLoss(err error) *Error {
 	var msg string
-	if opts.Error == nil {
+	if err == nil {
 		msg = "server data loss"
 	} else {
-		msg = opts.Error.Error()
+		msg = err.Error()
 	}
-	return f.newErrorWithDetailsHidden(codes.DataLoss, msg, opts.LogLevel)
+	return f.newErrorWithDetailsHidden(codes.DataLoss, msg, LogLevelError)
 }
 
 func (_ factory) newRequestDataLoss(opts ErrorInfoOptions) *Error {
-	return maker.newErrorInfoError(codes.DataLoss, opts)
+	return maker.newErrorInfoError(codes.DataLoss, LogLevelInfo, opts)
 }
 
-func (f factory) newUnknown(opts SimpleOptions) *Error {
+func (f factory) newUnknown(err error) *Error {
 	var msg string
-	if opts.Error == nil {
+	if err == nil {
 		msg = "something unknown happened"
 	} else {
-		msg = opts.Error.Error()
+		msg = err.Error()
 	}
-	return f.newErrorWithDetailsHidden(codes.Unknown, msg, opts.LogLevel)
+	return f.newErrorWithDetailsHidden(codes.Unknown, msg, LogLevelError)
 }
 
-func (f factory) newInternalError(opts SimpleOptions) *Error {
+func (f factory) newInternalError(err error) *Error {
 	var msg string
-	if opts.Error == nil {
+	if err == nil {
 		msg = "an internal server error happened"
 	} else {
-		msg = opts.Error.Error()
+		msg = err.Error()
 	}
-	return f.newErrorWithDetailsHidden(codes.Internal, msg, opts.LogLevel)
+	return f.newErrorWithDetailsHidden(codes.Internal, msg, LogLevelError)
 }
 
-func (f factory) newNotImplemented(logLevel LogLevel) *Error {
+func (f factory) newNotImplemented() *Error {
 	const msg = "not implemented"
 	e := &Error{
 		status:   *status.New(codes.Unimplemented, msg),
-		logLevel: logLevel,
+		logLevel: LogLevelInfo,
 	}
 	return e
 }
 
-func (f factory) newUnavailable(opts SimpleOptions) *Error {
+func (f factory) newUnavailable(err error) *Error {
 	var msg string
-	if opts.Error == nil {
+	if err == nil {
 		msg = "the operation is currently unavailable"
 	} else {
-		msg = opts.Error.Error()
+		msg = err.Error()
 	}
-	return f.newErrorWithDetailsHidden(codes.Unavailable, msg, opts.LogLevel)
+	return f.newErrorWithDetailsHidden(codes.Unavailable, msg, LogLevelInfo)
 }
 
-func (f factory) newDeadlineExceeded(opts SimpleOptions) *Error {
-	var msg string
-	if opts.Error == nil {
-		msg = "the operation timed out (it might have succeeded though)"
-	} else {
-		msg = opts.Error.Error()
-	}
-	return f.newErrorWithDetailsHidden(codes.DeadlineExceeded, msg, opts.LogLevel)
+func (f factory) newDeadlineExceeded() *Error {
+	return f.newErrorWithDetailsHidden(
+		codes.DeadlineExceeded,
+		"the operation timed out (it might have succeeded though)",
+		LogLevelWarn,
+	)
 }
 
 /* ------------------------- Factory helper methods ------------------------- */
 
-func (_ factory) newBadRequest(msg string, opts BadRequestOptions) *Error {
-	var logLevel LogLevel
-	switch opts.LogLevel {
-	case LogLevelUnspecified:
-		logLevel = LogLevelInfo
-	default:
-		logLevel = opts.LogLevel
-	}
+func (_ factory) newBadRequest(msg string, violation BadRequestViolation) *Error {
 	e := &Error{
 		status:   *status.New(codes.InvalidArgument, msg),
-		logLevel: logLevel,
+		logLevel: LogLevelInfo,
 	}
 
-	_ = e.AddBadRequestViolations([]BadRequestViolation{opts.Violation})
+	_ = e.AddBadRequestViolations([]BadRequestViolation{violation})
 	return e
 }
 
-func (_ factory) newBatchBadRequest(msg string, opts BadRequestBatchOptions) *Error {
-	var logLevel LogLevel
-	switch opts.LogLevel {
-	case LogLevelUnspecified:
-		logLevel = LogLevelInfo
-	default:
-		logLevel = opts.LogLevel
-	}
+func (_ factory) newBatchBadRequest(msg string, violations []BadRequestViolation) *Error {
 	e := &Error{
 		status:   *status.New(codes.InvalidArgument, msg),
-		logLevel: logLevel,
+		logLevel: LogLevelInfo,
 	}
-
-	_ = e.AddBadRequestViolations(opts.Violations)
+	_ = e.AddBadRequestViolations(violations)
 	return e
 }
 
-func (f factory) newErrorInfoError(code codes.Code, opts ErrorInfoOptions) *Error {
+func (f factory) newErrorInfoError(code codes.Code, logLevel LogLevel, opts ErrorInfoOptions) *Error {
+	if opts.Error == nil {
+		return nil
+	}
 	e := &Error{
 		status:   *status.New(code, opts.Error.Error()),
-		logLevel: opts.LogLevel,
+		logLevel: logLevel,
 	}
 	_ = e.SetErrorInfo(f.domain, opts.Reason, opts.Metadata)
 	return e

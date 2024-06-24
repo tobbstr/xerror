@@ -24,8 +24,8 @@ func TestErrorFrom(t *testing.T) {
 	}{
 		{
 			name: "err is of type status.Status",
-			args: args{err: status.New(codes.Canceled, "request canceled by the client").Err()},
-			want: xerror.NewCanceled(),
+			args: args{err: status.New(codes.Canceled, "request cancelled by the client").Err()},
+			want: xerror.NewCancelled(),
 		},
 		{
 			name: "err is not of type status.Status",
@@ -81,7 +81,7 @@ func TestUnaryXErrorInterceptor(t *testing.T) {
 			name: "xerror without hidden details",
 			given: given{
 				handler: func(ctx context.Context, req any) (any, error) {
-					return nil, xerror.NewCanceled().
+					return nil, xerror.NewCancelled().
 						SetDebugInfo("this is a debug message", []string{"line 1", "line 2"}).
 						SetErrorInfo("this is an error message", "this is a reason", map[string]any{"key": "value"})
 				},
@@ -95,7 +95,7 @@ func TestUnaryXErrorInterceptor(t *testing.T) {
 			name: "xerror with hidden details",
 			given: given{
 				handler: func(ctx context.Context, req any) (any, error) {
-					return nil, xerror.NewCanceled().
+					return nil, xerror.NewCancelled().
 						SetDebugInfo("this is a debug message", []string{"line 1", "line 2"}).
 						SetErrorInfo("this is an error message", "this is a reason", map[string]any{"key": "value"}).
 						HideDetails() // This call should hide the details

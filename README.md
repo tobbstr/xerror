@@ -102,7 +102,7 @@ To help you understand the organization of error types, a visual overview is pro
 ```mermaid
 flowchart LR
 subgraph "Problems with the Request"
-    CANCELED
+    CANCELLED
     subgraph INVALID_ARGUMENT
         OUT_OF_RANGE
         NOT_FOUND

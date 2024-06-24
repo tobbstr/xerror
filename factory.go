@@ -269,8 +269,8 @@ func (_ factory) newResourceExhausted(opts ErrorInfoOptions) *Error {
 	return maker.newErrorInfoError(codes.ResourceExhausted, LogLevelWarn, opts)
 }
 
-func (_ factory) newCanceledError() *Error {
-	const msg = "request canceled by the client"
+func (_ factory) newCancelledError() *Error {
+	const msg = "request cancelled by the client"
 	e := &Error{
 		status: *status.New(codes.Canceled, msg),
 	}

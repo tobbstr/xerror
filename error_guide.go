@@ -29,14 +29,14 @@ type serverIssue struct{}
 
 type requestIssue struct{}
 
-// Canceled is used when a request is canceled by the client before the server has completed processing it.
+// Cancelled is used when a request is cancelled by the client before the server has completed processing it.
 // Suppose a client sends a request to a server to perform a long-running computation. After some time, the client
 // decides to cancel the request because it no longer needs the result. The client sends a cancellation request to
-// the server, and the server should then respond with a Canceled error.
+// the server, and the server should then respond with a Cancelled error.
 //
 // This case is a "CANCELLED" error.
-func (requestIssue) Canceled() func() *Error {
-	return maker.newCanceledError
+func (requestIssue) Cancelled() func() *Error {
+	return maker.newCancelledError
 }
 
 // InvalidArgument is used when a request is rejected due to invalid input.

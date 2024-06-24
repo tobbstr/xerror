@@ -2,7 +2,7 @@
     "logLevel": 0,
     "status": {
         "code": 1,
-        "message": "request canceled by the client",
+        "message": "request cancelled by the client",
         "details": [
             {
                 "type_url": "type.googleapis.com/google.rpc.DebugInfo",

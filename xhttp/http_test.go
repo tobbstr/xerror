@@ -214,13 +214,13 @@ func TestRespondFailed(t *testing.T) {
 			},
 		},
 		{
-			name: "canceled",
+			name: "cancelled",
 			given: given{
-				err: xerror.NewCanceled(),
+				err: xerror.NewCancelled(),
 			},
 			want: want{
 				code: 499,
-				body: "testdata/respond_failed/canceled.json",
+				body: "testdata/respond_failed/cancelled.json",
 			},
 		},
 		{

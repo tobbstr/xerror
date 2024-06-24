@@ -140,11 +140,11 @@ func NewResourceExhausted(opts ErrorInfoOptions) *Error {
 	return maker.newResourceExhausted(opts)
 }
 
-// NewCanceled creates a new Canceled error.
+// NewCancelled creates a new Cancelled error.
 //
 // For when to use this, see the ErrorGuide function for more information.
-func NewCanceled() *Error {
-	return maker.newCanceledError()
+func NewCancelled() *Error {
+	return maker.newCancelledError()
 }
 
 // NewServerDataLoss creates a new DataLoss error.

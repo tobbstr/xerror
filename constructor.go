@@ -6,7 +6,56 @@ package xerror
 
 // NewInvalidArgument creates a new InvalidArgument error.
 //
-// For when to use this, see the ErrorGuide function for more information.
+// Parameters:
+//
+//	Field:
+//		A path that leads to a field in the request body. The value will be a
+//		sequence of dot-separated identifiers that identify a protocol buffer
+//		field.
+//
+//		Consider the following:
+//
+//		message CreateContactRequest {
+//		  message EmailAddress {
+//		    enum Type {
+//		      TYPE_UNSPECIFIED = 0;
+//		      HOME = 1;
+//		      WORK = 2;
+//		    }
+//
+//		    optional string email = 1;
+//		    repeated EmailType type = 2;
+//		  }
+//
+//		  string full_name = 1;
+//		  repeated EmailAddress email_addresses = 2;
+//		}
+//
+//		In this example, in proto, `field` could take one of the following values:
+//
+//		  - `full_name` for a violation in the `full_name` value
+//		  - `email_addresses[1].email` for a violation in the `email` field of the
+//		    first `email_addresses` message
+//		  - `email_addresses[3].type[2]` for a violation in the second `type`
+//		    value in the third `email_addresses` message.
+//
+//		In JSON, the same values are represented as:
+//
+//		  - `fullName` for a violation in the `fullName` value
+//		  - `emailAddresses[1].email` for a violation in the `email` field of the
+//		    first `emailAddresses` message
+//		  - `emailAddresses[3].type[2]` for a violation in the second `type`
+//		    value in the third `emailAddresses` message.
+//
+//	Description:
+//		A description of why the request element is bad. See the below examples:
+//
+//		  - `fullName`: "The full name of the contact. It should include both first
+//		    and last names. Example: `John Doe`".
+//		  - `emailAddresses[3].type[2]`: "The type of the email address. It can be HOME,
+//		    WORK, or unspecified. Example: [HOME, WORK]".
+//
+// For when to use this error type, see the ErrorGuide function for more information.
 func NewInvalidArgument(field, description string) *Error {
 	return maker.newInvalidArgument(field, description)
 }
@@ -21,18 +70,23 @@ func NewInvalidArgumentBatch(violations []BadRequestViolation) *Error {
 
 // NewFailedPrecondition creates a new FailedPrecondition error.
 //
-// The description is a description of how the precondition failed. Developers can use this
-// description to understand how to fix the failure.  For example, "Terms of service not accepted".
+// Parameters:
 //
-// The subject is the subject, relative to the type, that failed.
-// For example, "google.com/cloud" relative to the "TOS" type would indicate
-// which terms of service is being referenced.
+//	Description:
+//		Is a description of how the precondition failed. Developers can use this
+//		description to understand how to fix the failure.  For example, "Terms of service not accepted".
 //
-// Typ is the type of PreconditionFailure. It's recommended using a service-specific
-// enum type to define the supported precondition violation subjects. For
-// example, "TOS" for "Terms of Service violation".
+//	Subject:
+//		Is the subject, relative to the type, that failed.
+//		For example, "google.com/cloud" relative to the "TOS" type would indicate
+//		which terms of service is being referenced.
 //
-// For when to use this, see the ErrorGuide function for more information.
+//	Typ:
+//		Is the type of PreconditionFailure. It is recommended to use a service-specific
+//		enum type to define the supported precondition violation subjects. For
+//		example, "TOS" for "Terms of Service violation".
+//
+// For when to use this error type, see the ErrorGuide function for more information.
 func NewPreconditionFailure(subject, typ, description string) *Error {
 	return maker.newPreconditionFailure(subject, typ, description)
 }
@@ -44,6 +98,8 @@ func NewPreconditionFailureBatch(violations []PreconditionViolation) *Error {
 }
 
 // NewOutOfRange creates a new OutOfRange error.
+//
+// Parameters: see NewInvalidArgument
 //
 // For when to use this, see the ErrorGuide function for more information.
 func NewOutOfRange(field, description string) *Error {
@@ -111,15 +167,17 @@ func NewAlreadyExistsBatch(infos []ResourceInfo) *Error {
 // NewQuotaFailure creates a new QuotaFailure error, which is a specialized version of a resource exhausted error.
 //
 // Parameters:
-//   - Subject on which the quota check failed.
-//     For example, "clientip:<ip address of client>" or "project:<Google
-//     developer project id>".
-//   - Description of how the quota check failed. Clients can use this
-//     description to find more about the quota configuration in the service's
-//     public documentation, or find the relevant quota limit to adjust through
-//     developer console.
-//     For example: "Service disabled" or "Daily Limit for read operations
-//     exceeded".
+//
+//	Subject:
+//		The subject on which the quota check failed.
+//		For example, "clientip:<ip address of client>" or "project:<Google
+//		developer project id>".
+//	Description:
+//		Description of how the quota check failed. Clients can use this
+//		description to find more about the quota configuration in the service's
+//		public documentation.
+//		For example: "Service disabled" or "Daily Limit for read operations
+//		exceeded".
 //
 // For when to use this, see the ErrorGuide function for more information.
 func NewQuotaFailure(subject, description string) *Error {
